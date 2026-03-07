@@ -1,0 +1,17 @@
+services:
+  bot:
+    build: .
+    container_name: threads-shadow-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/threads_scheduler.db
+    # If using Ollama on the same host, you might need:
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
+volumes:
+  data:
