@@ -62,7 +62,7 @@ docker-compose up -d --build
 ```
 Data (SQLite and logs) are stored in the `./data` folder for persistence.
 
-## 📈 "Challenge 2025" Strategy
+## 📈 "Challenge 2026" Strategy
 The Shadow account is locked to **Plain English** and focuses on three pillars:
 1.  **Myth-busting:** Debunking common misconceptions in Tech and DIY.
 2.  **Behind-the-scenes:** The logic of building autonomous systems.
