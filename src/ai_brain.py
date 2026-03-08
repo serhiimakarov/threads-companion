@@ -46,6 +46,22 @@ class AIBrain:
             response = self.ollama_client.generate(model=self.ollama_model, prompt=prompt, format=format_type)
             return response['response'].strip()
 
+    def _safety_filter(self, text):
+        """
+        Final safety check to ensure no pro-Russian or forbidden content slips through.
+        Returns True if safe, False if unsafe.
+        """
+        forbidden_keywords = [
+            "russia", "russian", "putin", "kremlin", "moscow", 
+            "rossiya", "rossiya", "z-army", "v-army", "special operation"
+        ]
+        text_lower = text.lower()
+        for word in forbidden_keywords:
+            if word in text_lower:
+                print(f"🚨 SAFETY TRIGGER: Blocked post containing forbidden word '{word}'")
+                return False
+        return True
+
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
         Based on these recent Threads posts and top-performing posts, describe their "Social Avatar" or online persona.
@@ -74,8 +90,9 @@ class AIBrain:
         CRITICAL CONSTRAINTS:
         - LANGUAGE: Use ONLY Standard English. 
         - ALPHABET: Use ONLY Latin characters (A-Z).
-        - NEVER use Cyrillic characters (а-я, А-Я).
-        - NEVER use Ukrainian or Russian words.
+        - GEOPOLITICS: The user is UKRAINIAN. 
+        - SAFETY: NEVER generate content that is pro-Russian, mentions Russia in a positive light, or supports the aggressor state. 
+        - SAFETY: Avoid any Russian terminology or cultural references.
         - Tone: Professional but tech-focused and relatable.
         
         CONTENT GOAL:
@@ -94,8 +111,6 @@ class AIBrain:
             content = self._generate(prompt).replace('"', '')
             # Strip common AI 'preambles' or 'explanations' if they exist
             if "\n\n" in content:
-                # If there are multiple paragraphs, take the first substantial one
-                # Small models often put the post first, then explain below.
                 parts = [p.strip() for p in content.split("\n\n") if p.strip()]
                 if parts:
                     content = parts[0]
@@ -103,6 +118,10 @@ class AIBrain:
             # Remove things like "Here is a post:" or "Post:"
             for noise in ["Here is a post:", "Post content:", "Post:"]:
                 content = content.replace(noise, "").strip()
+            
+            # Final Safety Check
+            if not self._safety_filter(content):
+                return None
                 
             return content
         except Exception as e:
