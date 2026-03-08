@@ -52,6 +52,8 @@ The bot automatically handles **Long-lived tokens (60 days)**. You must authoriz
     `./venv/bin/python3 manage.py auto --dry-run` — Preview AI generated content.
 *   **View Queue:**
     `./venv/bin/python3 manage.py list` — See upcoming scheduled posts.
+*   **Delete Post:**
+    `./venv/bin/python3 manage.py delete [ID]` — Kill a scheduled post by its ID.
 *   **Check Performance:**
     `./venv/bin/python3 manage.py stats --refresh` — View engagement metrics.
 
