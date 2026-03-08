@@ -29,6 +29,10 @@ def main():
     # List posts
     subparsers.add_parser("list", help="List pending posts")
     
+    # Delete post
+    delete_parser = subparsers.add_parser("delete", help="Delete a scheduled post by ID")
+    delete_parser.add_argument("id", type=int, help="The ID of the post to delete")
+
     # Auto Agent
     auto_parser = subparsers.add_parser("auto", help="Run the autonomous agent once")
     auto_parser.add_argument("--dry-run", action="store_true", help="Generate posts but don't save them to the database")
@@ -65,6 +69,19 @@ def main():
             print("-" * 90)
             for post in posts:
                 print(f"{post[0]:<5} {post[3]:<20} {post[2]:<10} {post[1][:47] + '...' if len(post[1]) > 47 else post[1]:<50}")
+
+    elif args.command == "delete":
+        import sqlite3
+        from src.config import DATABASE_PATH
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM scheduled_posts WHERE id = ?", (args.id,))
+        conn.commit()
+        if cursor.rowcount > 0:
+            print(f"✅ Post {args.id} has been killed.")
+        else:
+            print(f"❌ Post {args.id} not found.")
+        conn.close()
 
     elif args.command == "auto":
         from src.agent import run_agent
