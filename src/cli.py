@@ -68,7 +68,7 @@ def main():
             print("\n📅 SCHEDULED POSTS QUEUE")
             print("=" * 90)
             for post in posts:
-                post_id, content, platform, time_str, status = post
+                post_id, content, platform, time_str = post
                 print(f"🆔 ID: {post_id} | 🕒 {time_str} | 📱 {platform.upper()}")
                 print(f"📝 CONTENT:")
                 print(f"{content}")
