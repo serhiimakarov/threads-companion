@@ -3,7 +3,6 @@ import schedule
 from datetime import datetime
 from src.database import init_db, get_pending_posts, mark_post_status, log_stat
 from src.threads_client import ThreadsClient
-from src.x_client import XClient
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET
 from src.agent import run_agent
 from src.interactions import process_interactions
@@ -19,7 +18,6 @@ def run_scheduler():
         return
 
     threads_client = ThreadsClient(THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET)
-    x_client = XClient()
 
     def job_check_posts():
         print(f"[{datetime.now()}] Checking for pending posts...")
@@ -36,12 +34,9 @@ def run_scheduler():
             try:
                 if platform == 'threads':
                     published_id = threads_client.post_text(content)
-                elif platform == 'x':
-                    if not x_client.is_active():
-                        raise Exception("X Client not configured.")
-                    published_id = x_client.post_text(content)
                 else:
-                    raise Exception(f"Unknown platform: {platform}")
+                    print(f"Skipping unknown platform: {platform}")
+                    continue
                     
                 print(f"Successfully published post {post_id} to {platform}. ID: {published_id}")
                 send_telegram_notification(f"🚀 *Post Published!*\n\n*Platform:* {platform.upper()}\n*Content:* {content[:100]}...")
