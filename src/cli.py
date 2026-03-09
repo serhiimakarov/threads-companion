@@ -63,12 +63,17 @@ def main():
     elif args.command == "list":
         posts = get_all_pending()
         if not posts:
-            print("No pending posts.")
+            print("📭 No pending posts.")
         else:
-            print(f"{'ID':<5} {'Time':<20} {'Platform':<10} {'Content':<50}")
-            print("-" * 90)
+            print("\n📅 SCHEDULED POSTS QUEUE")
+            print("=" * 90)
             for post in posts:
-                print(f"{post[0]:<5} {post[3]:<20} {post[2]:<10} {post[1][:47] + '...' if len(post[1]) > 47 else post[1]:<50}")
+                post_id, content, platform, time_str, status = post
+                print(f"🆔 ID: {post_id} | 🕒 {time_str} | 📱 {platform.upper()}")
+                print(f"📝 CONTENT:")
+                print(f"{content}")
+                print("-" * 90)
+            print(f"Total pending: {len(posts)}\n")
 
     elif args.command == "delete":
         import sqlite3
