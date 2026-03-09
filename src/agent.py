@@ -9,22 +9,22 @@ from src.analytics import analyze_user_profile
 from src.ai_brain import AIBrain
 from src.notifications import send_telegram_notification
 
-def run_agent():
-    print("🧠 AI Agent is seizing control...")
+def run_agent(dry_run=False):
+    print(f"🧠 AI Agent is seizing control... {'(DRY RUN)' if dry_run else ''}")
     init_db()
     
     # --- SPAM PROTECTION ---
-    # Check if we already have posts scheduled for the next 24 hours
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    one_day_from_now = datetime.datetime.now() + timedelta(days=1)
-    cursor.execute('SELECT COUNT(*) FROM scheduled_posts WHERE status = "pending" AND scheduled_time < ?', (one_day_from_now,))
-    pending_count = cursor.fetchone()[0]
-    conn.close()
+    if not dry_run:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        one_day_from_now = datetime.datetime.now() + timedelta(days=1)
+        cursor.execute('SELECT COUNT(*) FROM scheduled_posts WHERE status = "pending" AND scheduled_time < ?', (one_day_from_now,))
+        pending_count = cursor.fetchone()[0]
+        conn.close()
 
-    if pending_count > 0:
-        print(f"🛡️ Spam Protection: {pending_count} posts already scheduled for the next 24h. Skipping strategy session.")
-        return
+        if pending_count > 0:
+            print(f"🛡️ Spam Protection: {pending_count} posts already scheduled for the next 24h. Skipping strategy session.")
+            return
 
     if not THREADS_ACCESS_TOKEN_TARGET:
         print("❌ Error: Target token missing.")
@@ -70,14 +70,17 @@ def run_agent():
             scheduled_dt += timedelta(minutes=jitter)
 
             # ONLY THREADS
-            add_scheduled_post(content, scheduled_dt, platform='threads')
-            print(f"✅ Scheduled: \"{content[:30]}...\" at {scheduled_dt}")
+            if not dry_run:
+                add_scheduled_post(content, scheduled_dt, platform='threads')
+                print(f"✅ Scheduled: \"{content[:30]}...\" at {scheduled_dt}")
+            else:
+                print(f"🧪 [DRY RUN] Generated: \"{content[:50]}...\" for {scheduled_dt}")
             scheduled_count += 1
             
         except Exception as e:
             print(f"❌ Failed to schedule slot: {e}")
 
-    if scheduled_count > 0:
+    if scheduled_count > 0 and not dry_run:
         send_telegram_notification(f"🧠 *AI Strategy Session Complete*\n\nCleaned the slate and decided on *{scheduled_count}* new posts for the next 24 hours.")
 
 if __name__ == "__main__":
