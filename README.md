@@ -1,74 +1,79 @@
-# Threads Shadow AI: The Autonomous Social Agent 🤖⚔️🦾
+# Threads Shadow AI Agent 🤖🧵🦾
 
-An experimental AI agent for Threads operating in "Shadow Mode." It analyzes your main account (Source), studies top indie hacker strategies, and manages a parallel profile (Target) to compete for maximum engagement.
+A fully autonomous social media agent designed to "shadow" a reference account, optimize engagement using AI, and manage a secondary account with zero human intervention. Optimized for the 2025 Threads algorithm and local execution.
 
-## ✨ Key Features
+## 🌟 Features
 
-*   **Shadow Mode:** Analyzes your main account (Source) for inspiration, tone, and vibe.
-*   **Dual-Brain AI:** Supports both cloud-based **Google Gemini** and local **Ollama (Llama 3.2)**.
-*   **Mentor Integration:** Incorporates principles from Alex Hormozi, Pieter Levels, Marc Lou, and Dan Koe for content generation.
-*   **Smart Cross-Pollination:** Automatically creates high-engagement quote-posts based on your manual activity.
-*   **Total Autonomy:** The bot independently decides posting frequency (1-4 posts/day) and optimal timing with human-like jitter.
-*   **Telegram Control:** Real-time notifications for every post, like, or strategy shift.
-*   **Weekly Strategy Review:** Automatic deep-dive analysis every Sunday to pivot the strategy for the following week.
-*   **Docker Ready:** Optimized for 24/7 operation on Raspberry Pi.
+- **Dual-Account "Shadowing":** Analyzes a source account to learn vibe, topics, and timing.
+- **Autonomous Strategy:** Decides how many posts to schedule and at what times (with human-like jitter).
+- **AI Brain (Cloud/Local):** Supports Google Gemini 2.5 Flash and local LLMs via Ollama.
+- **Shadow Browser Engine:** Bypasses API restrictions by using Playwright to like posts via a headless browser.
+- **Smart Engagement:** Automatically replies to followers and likes comments using AI evaluation.
+- **Outbound Growth:** Searches for niche-specific tags and leaves smart comments on strangers' posts to grow the audience.
+- **Telegram Notifications:** Get real-time updates on your phone for every post, like, and reply.
+- **Raspberry Pi Ready:** Fully containerized with Docker for 24/7 low-power operation.
+
+## 🛠️ Tech Stack
+
+- **Python 3.11+**
+- **Playwright** (Browser Automation)
+- **Google GenAI / Ollama** (LLM Brain)
+- **SQLite** (Persistent Queue & Stats)
+- **Docker & Docker Compose**
 
 ## 🚀 Quick Start
 
-### 1. Installation
+### 1. Setup Environment
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+playwright install chromium
 ```
 
-### 2. Configuration (`.env`)
-Copy `.env.example` to `.env` and fill in your keys:
-*   `THREADS_APP_ID / SECRET`: From the Meta for Developers dashboard.
-*   `GEMINI_API_KEY`: For cloud-based AI.
-*   `TELEGRAM_BOT_TOKEN / CHAT_ID`: For mobile notifications.
-*   `AI_PROVIDER`: Choose `gemini` or `ollama`.
+### 2. Configure Credentials
+Copy `.env.example` to `.env` and fill in:
+- `THREADS_ACCESS_TOKEN_SOURCE`: Your manual reference account.
+- `THREADS_ACCESS_TOKEN_TARGET`: The bot-controlled account.
+- `GEMINI_API_KEY` (or set `AI_PROVIDER=ollama`).
+- `TELEGRAM_BOT_TOKEN` & `CHAT_ID`.
 
-### 3. Meta App Setup
-To get your `THREADS_APP_ID` and `THREADS_APP_SECRET`:
-1.  Go to [Meta for Developers](https://developers.facebook.com/).
-2.  **Create App:** Choose "Other" -> "Next" -> "Threads".
-3.  **Permissions:** Ensure `threads_content_publish`, `threads_basic`, and `threads_manage_replies` are enabled.
-4.  **Redirect URI:** In Threads -> Settings, add `https://threads.local/auth/callback`.
-5.  **Local Fix:** Add `127.0.0.1 threads.local` to your `/etc/hosts` file.
-
-### 4. Authentication (Critical!)
-The bot automatically handles **Long-lived tokens (60 days)**. You must authorize both accounts:
+### 3. Initialize Browser Session
+Run this once to log into your Shadow account manually and save cookies:
 ```bash
-./venv/bin/python3 manage.py auth --account source # Your manual profile
-./venv/bin/python3 manage.py auth --account target # The bot profile
+mkdir -p data && ./venv/bin/python3 src/session_manager.py
 ```
 
-## 🛠️ Usage (CLI)
+### 4. Run the Bot
+```bash
+# Direct run
+./venv/bin/python3 manage.py run
 
-*   **Run the Bot (Daemon):**
-    `nohup ./venv/bin/python3 manage.py run > bot.log 2>&1 &`
-*   **Strategy Preview (Dry Run):**
-    `./venv/bin/python3 manage.py auto --dry-run` — Preview AI generated content.
-*   **View Queue:**
-    `./venv/bin/python3 manage.py list` — See upcoming scheduled posts.
-*   **Delete Post:**
-    `./venv/bin/python3 manage.py delete [ID]` — Kill a scheduled post by its ID.
-*   **Check Performance:**
-    `./venv/bin/python3 manage.py stats --refresh` — View engagement metrics.
+# Background run
+nohup ./venv/bin/python3 manage.py run > bot.log 2>&1 &
+```
 
-## 🐳 Docker (Raspberry Pi)
+## 🐳 Docker Deployment (Raspberry Pi)
 
 ```bash
 docker-compose up -d --build
 ```
-Data (SQLite and logs) are stored in the `./data` folder for persistence.
+*Note: Database and session data are stored in the `./data` volume for persistence.*
 
-## 📈 "Challenge 2026" Strategy
-The Shadow account is locked to **Plain English** and focuses on three pillars:
-1.  **Myth-busting:** Debunking common misconceptions in Tech and DIY.
-2.  **Behind-the-scenes:** The logic of building autonomous systems.
-3.  **Engagement Hooks:** Every post ends with a targeted question.
+## 📊 Commands
+
+- `./manage.py auth --account [source/target]`: Authenticate accounts.
+- `./manage.py auto`: Manually trigger an AI strategy & posting session.
+- `./manage.py list`: View all upcoming scheduled posts.
+- `./manage.py stats`: View engagement metrics.
+- `./manage.py delete [ID]`: Remove a pending post from the queue.
+
+## 📈 The Shadow Strategy
+The bot follows a "Micro-Gap" strategy for 2025:
+- **Frequency:** 2-3 posts per day.
+- **Timing:** Optimized morning windows (9:45 AM - 11:15 AM).
+- **Engagement:** Every post ends with a call-to-action question.
+- **Mimicry:** Learns from your top-performing manual posts.
 
 ---
-*Created with 🦾 by Gemini CLI for @serhiimakarov*
+Built with ❤️ by Serhii Makarov & his AI Assistant.
