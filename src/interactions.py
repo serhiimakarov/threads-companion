@@ -63,7 +63,12 @@ def process_interactions():
         for post in target_threads.get('data', []):
             post_id = post['id']
             post_text = post.get('text', '')
-            replies_data = target_client.get_replies(post_id)
+            
+            try:
+                replies_data = target_client.get_replies(post_id)
+            except Exception as e:
+                print(f"⚠️ Could not fetch replies for post {post_id}: {e}")
+                continue
             
             for reply in replies_data.get('data', []):
                 reply_id = reply['id']
