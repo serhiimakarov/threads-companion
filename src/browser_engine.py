@@ -49,6 +49,16 @@ class BrowserEngine:
                 for url in urls[:limit]:
                     page.goto(url)
                     time.sleep(3)
+                    
+                    # 1. LIKE THE POST FIRST (Visibility)
+                    try:
+                        like_btn = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
+                        if like_btn.is_visible():
+                            like_btn.click()
+                            print(f"❤️ Liked stranger's post: {url}")
+                            time.sleep(1)
+                    except: pass
+
                     txt_elem = page.locator('div[data-testid="post-text-container"]').first
                     if not txt_elem.is_visible(): continue
                     
