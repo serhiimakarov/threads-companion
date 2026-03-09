@@ -1,98 +1,90 @@
-import collections
-import statistics
-from datetime import datetime
+import sqlite3
+from src.config import DATABASE_PATH
+from src.ai_brain import AIBrain
 
-def get_weekly_summary():
+def get_target_performance():
     """
-    Reads the last 7 days of stats from the database and returns a trend summary.
+    Analyzes the bot's own performance from the database.
+    Returns top performing topics and average engagement.
     """
-    import sqlite3
-    from src.config import DATABASE_PATH
-    from datetime import datetime, timedelta
-
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
-
-    seven_days_ago = (datetime.now() - timedelta(days=7)).date()
-
-    cursor.execute('''
-        SELECT metric_name, SUM(metric_value) 
-        FROM stats 
-        WHERE metric_date >= ? 
-        GROUP BY metric_name
-    ''', (seven_days_ago,))
-
-    weekly_stats = cursor.fetchall()
+    
+    # Get last 20 posted items with their stats (if we had them in DB)
+    # Since we log stats per day, we'll look at general growth trends
+    cursor.execute('SELECT metric_name, metric_value FROM stats WHERE platform = "threads" ORDER BY metric_date DESC LIMIT 10')
+    stats = cursor.fetchall()
+    
+    # Get last 10 posted contents to analyze their "vibe"
+    cursor.execute('SELECT content FROM scheduled_posts WHERE status = "posted" ORDER BY scheduled_time DESC LIMIT 10')
+    recent_posts = [row[0] for row in cursor.fetchall()]
+    
     conn.close()
-
-    if not weekly_stats:
-        return "No data collected yet for this week."
-
-    summary = "Weekly Performance:\n"
-    for name, value in weekly_stats:
-        summary += f"- {name}: {value}\n"
-
-    return summary
+    return {
+        "recent_stats": stats,
+        "recent_posts": recent_posts
+    }
 
 def analyze_user_profile(client):
     """
-    Analyzes user profile and posts to return structured insights.
+    Analyzes the SOURCE user profile to get initial vibe and peak hours.
     """
-    profile = client.get_user_profile()
-    threads_data = client.get_user_threads(limit=50)
-    posts = threads_data.get('data', [])
+    try:
+        threads = client.get_user_threads(limit=30)
+        data = threads.get('data', [])
+        
+        if not data:
+            return {"peak_hour": 10, "top_performing_posts": []}
+
+        # Calculate peak hour
+        hours = []
+        for post in data:
+            ts = post.get('timestamp')
+            if ts:
+                # Format: 2024-05-20T10:00:00+0000
+                dt = ts.split('T')[1].split(':')[0]
+                hours.append(int(dt))
+        
+        peak_hour = max(set(hours), key=hours.count) if hours else 10
+        
+        # Get top 3 posts by engagement
+        sorted_posts = sorted(data, key=lambda x: (x.get('like_count', 0) + x.get('reply_count', 0)), reverse=True)
+        top_posts = [p.get('text', '') for p in sorted_posts[:3] if p.get('text')]
+        
+        return {
+            "peak_hour": peak_hour,
+            "top_performing_posts": top_posts
+        }
+    except Exception as e:
+        print(f"Profile analysis failed: {e}")
+        return {"peak_hour": 10, "top_performing_posts": []}
+
+def get_weekly_summary():
+    """
+    Generates a strategic summary for the user and the AI itself.
+    """
+    performance = get_target_performance()
+    brain = AIBrain()
     
-    if not posts:
-        return None
-
-    # --- Metrics ---
-    timestamps = []
-    lengths = []
-    words = []
-    media_types = collections.Counter()
-    engagement_data = []
+    stats_str = "\n".join([f"{s[0]}: {s[1]}" for s in performance['recent_stats']])
+    posts_str = "\n---\n".join(performance['recent_posts'])
     
-    for post in posts:
-        text = post.get('text', '')
-        media_type = post.get('media_type', 'UNKNOWN')
-        timestamp_str = post.get('timestamp')
-        
-        # Engagement
-        likes = post.get('like_count') or 0
-        replies = post.get('reply_count') or 0
-        reposts = post.get('repost_count') or 0
-        engagement_score = (likes * 1.0) + (replies * 2.0) + (reposts * 3.0)
-        
-        if text:
-            lengths.append(len(text))
-            engagement_data.append({'text': text, 'score': engagement_score})
-            for word in text.split():
-                clean_word = "".join(c for c in word if c.isalnum()).lower()
-                if len(clean_word) > 3:
-                    words.append(clean_word)
-        
-        if timestamp_str:
-            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-            timestamps.append(dt)
-        
-        media_types[media_type] += 1
-
-    # Sorting by performance
-    top_performing = sorted(engagement_data, key=lambda x: x['score'], reverse=True)[:5]
-
-    # Analysis
-    hours = [t.hour for t in timestamps]
-    peak_hour = statistics.mode(hours) if hours else 9
+    prompt = f"""
+    Analyze the following performance data for our Threads Bot:
     
-    avg_len = statistics.mean(lengths) if lengths else 0
-    common_words = [w[0] for w in collections.Counter(words).most_common(10)]
-
-    return {
-        'username': profile.get('username'),
-        'peak_hour': peak_hour,
-        'avg_length': int(avg_len),
-        'media_mix': dict(media_types),
-        'top_words': common_words,
-        'top_performing_posts': [p['text'] for p in top_performing],
-        'post_count': len(posts)
-    }
+    Current Stats:
+    {stats_str}
+    
+    Recent Posts:
+    {posts_str}
+    
+    Provide a brief strategic summary:
+    1. What topics seem to work?
+    2. What should we change in our tone or timing?
+    3. How is our growth progressing?
+    """
+    
+    try:
+        return brain._generate(prompt)
+    except:
+        return "Growth is steady. Continue following the current persona."

@@ -49,9 +49,13 @@ def run_agent(dry_run=False):
     top_posts_str = "\n---\n".join(insights['top_performing_posts'])
     persona = brain.generate_persona(posts_text, top_posts=top_posts_str)
     
-    # --- PROACTIVE DECISION MAKING ---
-    decisions = brain.decide_strategy(persona, insights['peak_hour'])
-    print(f"🎯 AI Strategy: {len(decisions.get('slots', []))} posts decided.")
+    # --- PROACTIVE SELF-OPTIMIZATION ---
+    from src.analytics import get_weekly_summary
+    performance_report = get_weekly_summary()
+    print(f"📊 Analyzing self-performance: {performance_report[:50]}...")
+    
+    decisions = brain.decide_strategy(persona, insights['peak_hour'], performance_report=performance_report)
+    print(f"🎯 AI Optimized Strategy: {len(decisions.get('slots', []))} posts decided.")
 
     scheduled_count = 0
     for slot in decisions.get('slots', []):

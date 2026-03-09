@@ -125,11 +125,22 @@ class AIBrain:
         except:
             return {'like': True, 'reply': None}
 
-    def decide_strategy(self, persona, peak_hour):
+    def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
-        You are: {persona}
-        Peak Posting Hour: {peak_hour}:00
-        Decide strategy for the next 24 hours.
+        You are the following Social Avatar: {persona}
+        
+        CURRENT PERFORMANCE DATA:
+        {performance_report if performance_report else "No historical data yet."}
+        
+        STRATEGIC GOAL:
+        - Peak Posting Hour: {peak_hour}:00
+        - Optimize for GROWTH and ENGAGEMENT.
+        
+        TASK:
+        Decide your posting strategy for the next 24 hours.
+        Adjust your posting frequency (1-4 posts) and topics based on what has worked recently according to the performance data.
+        If a certain topic failed, try a different approach.
+        
         Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "short description"}}]}}
         """
         try:
