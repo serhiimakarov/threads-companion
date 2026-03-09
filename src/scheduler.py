@@ -3,9 +3,11 @@ import schedule
 from datetime import datetime
 from src.database import init_db, get_pending_posts, mark_post_status, log_stat
 from src.threads_client import ThreadsClient
-from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, logger
+from src.x_client import XClient
+from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET
 from src.agent import run_agent
 from src.interactions import process_interactions
+from src.outbound import run_outbound_engagement
 from src.notifications import send_telegram_notification
 from src.analytics import get_weekly_summary
 
@@ -13,37 +15,43 @@ def run_scheduler():
     init_db()
     
     if not THREADS_ACCESS_TOKEN_TARGET:
-        logger.error("THREADS_ACCESS_TOKEN_TARGET is missing in .env.")
+        print("Error: THREADS_ACCESS_TOKEN_TARGET is missing in .env. Please run './manage.py auth --account target' first.")
         return
 
     threads_client = ThreadsClient(THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET)
+    x_client = XClient()
 
     def job_check_posts():
-        logger.info("Checking for pending posts...")
+        print(f"[{datetime.now()}] Checking for pending posts...")
         posts = get_pending_posts()
         
         if not posts:
-            logger.info("No pending posts found.")
+            print("No pending posts found.")
             return
 
         for post in posts:
             post_id, content, platform = post
-            if platform != 'threads':
-                continue # Ignore non-threads posts
-
-            logger.info(f"Publishing post {post_id} to Threads...")
+            print(f"Publishing post {post_id} to {platform}: {content[:30]}...")
             
             try:
-                published_id = threads_client.post_text(content)
-                logger.info(f"SUCCESS! Published to Threads. ID: {published_id}")
-                send_telegram_notification(f"🚀 *Post Published!*\n\n*Content:* {content[:100]}...")
+                if platform == 'threads':
+                    published_id = threads_client.post_text(content)
+                elif platform == 'x':
+                    if not x_client.is_active():
+                        raise Exception("X Client not configured.")
+                    published_id = x_client.post_text(content)
+                else:
+                    raise Exception(f"Unknown platform: {platform}")
+                    
+                print(f"Successfully published post {post_id} to {platform}. ID: {published_id}")
+                send_telegram_notification(f"🚀 *Post Published!*\n\n*Platform:* {platform.upper()}\n*Content:* {content[:100]}...")
                 mark_post_status(post_id, 'posted')
             except Exception as e:
-                logger.error(f"FAILED to publish post {post_id}: {e}")
+                print(f"Failed to publish post {post_id} to {platform}: {e}")
                 mark_post_status(post_id, 'failed')
 
     def job_fetch_stats():
-        logger.info("Fetching daily statistics...")
+        print(f"[{datetime.now()}] Fetching stats...")
         try:
             insights = threads_client.get_insights()
             if 'data' in insights:
@@ -53,48 +61,66 @@ def run_scheduler():
                     if values:
                         latest_value = values[-1]['value']
                         log_stat(name, latest_value, platform='threads')
-                        logger.info(f"Logged: {name} = {latest_value}")
+                        print(f"Logged Threads stat: {name} = {latest_value}")
         except Exception as e:
-            logger.error(f"Error fetching stats: {e}")
+            print(f"Error fetching Threads stats: {e}")
 
     def job_run_ai_agent():
-        logger.info("AI Agent starting strategy session...")
+        print(f"[{datetime.now()}] AI Agent is generating the next post...")
         try:
             run_agent()
         except Exception as e:
-            logger.error(f"AI Agent failed: {e}")
+            print(f"AI Agent failed: {e}")
 
     def job_process_interactions():
-        logger.info("Checking for new replies/interactions...")
+        print(f"[{datetime.now()}] AI Agent is checking for new replies to engage with...")
         try:
             process_interactions()
         except Exception as e:
-            logger.error(f"Interaction processing failed: {e}")
+            print(f"Interaction processing failed: {e}")
+
+    def job_outbound_growth():
+        print(f"[{datetime.now()}] AI Agent is going outbound to find new friends...")
+        try:
+            run_outbound_engagement()
+        except Exception as e:
+            print(f"Outbound growth failed: {e}")
 
     def job_weekly_review():
-        logger.info("Starting Weekly Strategy Review...")
+        print(f"[{datetime.now()}] Running Weekly Strategy Review...")
         try:
             summary = get_weekly_summary()
-            send_telegram_notification(f"📊 *Weekly Strategy Review*\n\n{summary}")
+            message = f"📊 *Weekly Strategy Review*\n\n{summary}\nOptimizing next week's vibe based on this data."
+            send_telegram_notification(message)
             run_agent() 
         except Exception as e:
-            logger.error(f"Weekly review failed: {e}")
+            print(f"Weekly review failed: {e}")
 
-    # Schedule
+    # Schedule jobs
     schedule.every(5).minutes.do(job_check_posts)
     schedule.every().day.at("23:59").do(job_fetch_stats)
+    
+    # Generate new AI posts 3 times per day
     schedule.every().day.at("08:00").do(job_run_ai_agent)
     schedule.every().day.at("14:00").do(job_run_ai_agent)
     schedule.every().day.at("20:00").do(job_run_ai_agent)
+    
+    # Weekly Review every Sunday at 9 PM
     schedule.every().sunday.at("21:00").do(job_weekly_review)
+    
+    # Check for interactions every 30 minutes
     schedule.every(30).minutes.do(job_process_interactions)
     
-    logger.info("--- THREADS SHADOW BOT STARTED ---")
+    # Outbound Growth 2 times per day
+    schedule.every().day.at("11:00").do(job_outbound_growth)
+    schedule.every().day.at("17:00").do(job_outbound_growth)
     
-    # Run once on start
-    job_fetch_stats() # Initial stats collection
+    print("Scheduler started. Press Ctrl+C to exit.")
+    
+    # Initial run on startup
     job_check_posts()
     job_process_interactions()
+    job_outbound_growth()
     job_run_ai_agent()
     
     while True:

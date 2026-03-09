@@ -2,4 +2,6 @@ requests
 python-dotenv
 schedule
 google-genai
+tweepy
 ollama
+playwright

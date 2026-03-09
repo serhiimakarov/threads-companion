@@ -128,6 +128,28 @@ class AIBrain:
             print(f"AI Post Error: {e}")
             return None
 
+    def generate_external_comment(self, persona, post_text):
+        """
+        Generates a comment for a stranger's post to attract attention.
+        """
+        prompt = f"""
+        You are the following Social Avatar: {persona}
+        
+        You found this interesting post in your feed:
+        "{post_text}"
+        
+        Write a short, smart, and slightly witty comment (max 200 chars).
+        The goal is to provide value or start a conversation, making people want to check your profile.
+        CRITICAL: Write in PLAIN ENGLISH only.
+        
+        Comment content:
+        """
+        try:
+            return self._generate(prompt).replace('"', '')
+        except Exception as e:
+            print(f"AI External Comment Error: {e}")
+            return None
+
     def evaluate_interaction(self, persona, post_text, reply_text):
         prompt = f"""
         You are: {persona}
