@@ -74,7 +74,10 @@ def run_agent(dry_run=False):
                 add_scheduled_post(content, scheduled_dt, platform='threads')
                 print(f"✅ Scheduled: \"{content[:30]}...\" at {scheduled_dt}")
             else:
-                print(f"🧪 [DRY RUN] Generated: \"{content[:50]}...\" for {scheduled_dt}")
+                print(f"\n🧪 [DRY RUN] Generated for {scheduled_dt}:")
+                print("-" * 60)
+                print(content)
+                print("-" * 60)
             scheduled_count += 1
             
         except Exception as e:
