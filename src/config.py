@@ -23,6 +23,13 @@ THREADS_REDIRECT_URI = os.getenv('THREADS_REDIRECT_URI')
 THREADS_ACCESS_TOKEN_TARGET = os.getenv('THREADS_ACCESS_TOKEN_TARGET')
 THREADS_ACCESS_TOKEN_SOURCE = os.getenv('THREADS_ACCESS_TOKEN_SOURCE')
 
+# X (Twitter) Credentials
+X_API_KEY = os.getenv('X_API_KEY')
+X_API_SECRET = os.getenv('X_API_SECRET')
+X_ACCESS_TOKEN = os.getenv('X_ACCESS_TOKEN')
+X_ACCESS_TOKEN_SECRET = os.getenv('X_ACCESS_TOKEN_SECRET')
+X_BEARER_TOKEN = os.getenv('X_BEARER_TOKEN')
+
 # AI Credentials
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini').lower() # 'gemini' or 'ollama'
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
