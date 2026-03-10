@@ -1,6 +1,5 @@
 import sqlite3
 from src.config import DATABASE_PATH
-from src.ai_brain import AIBrain
 
 def get_target_performance():
     """
@@ -10,8 +9,7 @@ def get_target_performance():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     
-    # Get last 20 posted items with their stats (if we had them in DB)
-    # Since we log stats per day, we'll look at general growth trends
+    # Get last 20 posted items with their stats
     cursor.execute('SELECT metric_name, metric_value FROM stats WHERE platform = "threads" ORDER BY metric_date DESC LIMIT 10')
     stats = cursor.fetchall()
     
@@ -41,7 +39,6 @@ def analyze_user_profile(client):
         for post in data:
             ts = post.get('timestamp')
             if ts:
-                # Format: 2024-05-20T10:00:00+0000
                 dt = ts.split('T')[1].split(':')[0]
                 hours.append(int(dt))
         
@@ -63,6 +60,8 @@ def get_weekly_summary():
     """
     Generates a strategic summary for the user and the AI itself.
     """
+    from src.ai_brain import AIBrain
+    
     performance = get_target_performance()
     brain = AIBrain()
     

@@ -3,13 +3,14 @@ import random
 import sqlite3
 from datetime import timedelta
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH
-from src.threads_client import ThreadsClient
-from src.database import add_scheduled_post, init_db
-from src.analytics import analyze_user_profile
-from src.ai_brain import AIBrain
-from src.notifications import send_telegram_notification
 
 def run_agent(dry_run=False):
+    from src.threads_client import ThreadsClient
+    from src.database import add_scheduled_post, init_db
+    from src.analytics import analyze_user_profile, get_weekly_summary
+    from src.ai_brain import AIBrain
+    from src.notifications import send_telegram_notification
+
     print(f"🧠 AI Agent is seizing control... {'(DRY RUN)' if dry_run else ''}")
     init_db()
     
@@ -50,7 +51,6 @@ def run_agent(dry_run=False):
     persona = brain.generate_persona(posts_text, top_posts=top_posts_str)
     
     # --- PROACTIVE SELF-OPTIMIZATION ---
-    from src.analytics import get_weekly_summary
     performance_report = get_weekly_summary()
     print(f"📊 Analyzing self-performance: {performance_report[:50]}...")
     
