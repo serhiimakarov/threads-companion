@@ -13,96 +13,104 @@ class BrowserEngine:
     def is_authenticated(self):
         return os.path.exists(self.state_path)
 
-    def like_post(self, post_url):
-        if not self.is_authenticated(): 
-            print("❌ Browser: Session not found.")
-            return False
-            
-        playwright_cm = sync_playwright()
+    def like_posts_batch(self, post_urls):
+        """
+        Likes multiple posts in a single browser session. 
+        MUCH better for Raspberry Pi resources.
+        """
+        if not self.is_authenticated() or not post_urls:
+            return []
+
+        liked_urls = []
         try:
-            p = playwright_cm.start()
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state=self.state_path)
-            page = context.new_page()
-            
-            page.goto(post_url)
-            time.sleep(3)
-            like_button = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
-            if like_button.is_visible():
-                like_button.click()
-                print(f"❤️ Successfully liked via browser: {post_url}")
-                time.sleep(1)
+            with sync_playwright() as p:
+                print(f"🚀 Launching browser for batch liking ({len(post_urls)} posts)...")
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(storage_state=self.state_path)
+                page = context.new_page()
+                
+                for url in post_urls:
+                    try:
+                        print(f"🕵️ Liking: {url}")
+                        page.goto(url, timeout=60000)
+                        time.sleep(4)
+                        
+                        like_btn = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
+                        if like_btn.is_visible():
+                            like_btn.click()
+                            liked_urls.append(url)
+                            print(f"✅ Success.")
+                            time.sleep(2)
+                        else:
+                            # Check if already liked
+                            if page.locator('svg[aria-label="Unlike"]').is_visible():
+                                print("✅ Already liked.")
+                                liked_urls.append(url)
+                            else:
+                                print("⚠️ Like button not found.")
+                    except Exception as e:
+                        print(f"❌ Failed to like {url}: {e}")
+                
                 browser.close()
-                playwright_cm.stop()
-                return True
-            
-            browser.close()
-            playwright_cm.stop()
         except Exception as e:
-            print(f"❌ Like error: {e}")
-            try: playwright_cm.stop()
-            except: pass
-        return False
+            print(f"❌ Batch like fatal error: {e}")
+        
+        return liked_urls
 
     def find_and_comment_on_tag(self, tag, comment_callback, limit=2):
         if not self.is_authenticated(): return 0
         
-        playwright_cm = sync_playwright()
         count = 0
         try:
-            p = playwright_cm.start()
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(storage_state=self.state_path)
-            page = context.new_page()
-            
-            print(f"🔎 Exploring #{tag}...")
-            page.goto(f"https://www.threads.net/search?q=%23{tag}")
-            time.sleep(6)
-            
-            # Extract post URLs
-            links = page.locator('a[href*="/post/"]').all()
-            urls = []
-            for l in links:
-                href = l.get_attribute('href')
-                if href:
-                    full_url = f"https://www.threads.net{href}" if href.startswith("/") else href
-                    if full_url not in urls: urls.append(full_url)
-            
-            for url in urls[:limit]:
-                try:
-                    page.goto(url)
-                    time.sleep(4)
-                    
-                    # Try to like
-                    like_btn = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
-                    if like_btn.is_visible():
-                        like_btn.click()
-                        time.sleep(1)
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(storage_state=self.state_path)
+                page = context.new_page()
+                
+                print(f"🔎 Exploring #{tag}...")
+                page.goto(f"https://www.threads.net/search?q=%23{tag}", timeout=60000)
+                time.sleep(7)
+                
+                links = page.locator('a[href*="/post/"]').all()
+                urls = []
+                for l in links:
+                    href = l.get_attribute('href')
+                    if href:
+                        full_url = f"https://www.threads.net{href}" if href.startswith("/") else href
+                        if full_url not in urls: urls.append(full_url)
+                
+                for url in urls[:limit]:
+                    try:
+                        page.goto(url, timeout=60000)
+                        time.sleep(5)
+                        
+                        # Try to like
+                        like_btn = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
+                        if like_btn.is_visible():
+                            like_btn.click()
+                            time.sleep(2)
 
-                    txt_elem = page.locator('div[data-testid="post-text-container"]').first
-                    if txt_elem.is_visible():
-                        comment = comment_callback(txt_elem.inner_text())
-                        if comment:
-                            reply_btn = page.locator('div[role="button"]:has(svg[aria-label="Reply"])').first
-                            if reply_btn.is_visible():
-                                reply_btn.click()
-                                time.sleep(2)
-                                page.keyboard.type(comment)
-                                time.sleep(1)
-                                post_btn = page.locator('div[role="button"]:has-text("Post")').first
-                                if post_btn.is_visible():
-                                    post_btn.click()
-                                    count += 1
-                                    print(f"✅ Commented on {url}")
-                                    time.sleep(5)
-                except Exception as post_err:
-                    print(f"⚠️ Error on post {url}: {post_err}")
-            
-            browser.close()
-            playwright_cm.stop()
+                        txt_elem = page.locator('div[data-testid="post-text-container"]').first
+                        if txt_elem.is_visible():
+                            comment = comment_callback(txt_elem.inner_text())
+                            if comment:
+                                reply_btn = page.locator('div[role="button"]:has(svg[aria-label="Reply"])').first
+                                if reply_btn.is_visible():
+                                    reply_btn.click()
+                                    time.sleep(2)
+                                    page.keyboard.type(comment)
+                                    time.sleep(2)
+                                    post_btn = page.locator('div[role="button"]:has-text("Post")').first
+                                    if post_btn.is_visible():
+                                        post_btn.click()
+                                        count += 1
+                                        print(f"✅ Commented on {url}")
+                                        time.sleep(5)
+                    except Exception as post_err:
+                        print(f"⚠️ Error on post {url}: {post_err}")
+                
+                browser.close()
         except Exception as e:
-            print(f"❌ Outbound error: {e}")
-            try: playwright_cm.stop()
-            except: pass
+            print(f"❌ Batch outbound fatal error: {e}")
             
         return count

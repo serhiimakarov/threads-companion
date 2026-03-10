@@ -1,4 +1,5 @@
 import time
+import requests
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE
 from src.threads_client import ThreadsClient
 from src.ai_brain import AIBrain
@@ -17,41 +18,45 @@ def process_interactions():
     browser = BrowserEngine()
     brain = AIBrain()
     
-    # --- 1. STALK THE HUMAN (Now with Browser Fallback) ---
+    # --- 1. STALK THE HUMAN (Batch Mode) ---
     if source_client:
         try:
-            print("🕵️ Analyzing Source account...")
-            # We need permalink for browser to work
+            print("🕵️ Analyzing Source account for new posts...")
             url = f"https://graph.threads.net/v1.0/me/threads?fields=id,permalink&access_token={THREADS_ACCESS_TOKEN_SOURCE}"
-            import requests
             source_threads = requests.get(url).json()
             
-            liked_count = 0
+            # 1. Collect all unliked posts
+            to_like = []
+            post_id_map = {} # Map permalink to post_id for database tracking
+            
             for post in source_threads.get('data', []):
                 post_id = post['id']
                 permalink = post.get('permalink', '').replace('threads.com', 'threads.net')
                 
-                if not is_interaction_processed(f"stalk_{post_id}"):
-                    print(f"❤️ Supporting the human: Liking via browser {permalink}")
-                    
-                    success = False
-                    if permalink:
-                        success = browser.like_post(permalink)
-                    
-                    if success:
-                        mark_interaction_processed(f"stalk_{post_id}", "liked_human_browser")
-                        liked_count += 1
-                    else:
-                        print("Skipping like (Browser not ready or failed).")
+                if permalink and not is_interaction_processed(f"stalk_{post_id}"):
+                    to_like.append(permalink)
+                    post_id_map[permalink] = post_id
             
-            if liked_count > 0:
-                send_telegram_notification(f"🤝 *Support Mode:* Liked {liked_count} of your latest posts via Shadow Browser.")
+            # 2. Process all likes in ONE browser session
+            if to_like:
+                print(f"📦 Found {len(to_like)} posts to like. Starting batch browser session...")
+                # We limit to last 5 to avoid long sessions
+                liked_urls = browser.like_posts_batch(to_like[:5])
+                
+                for url in liked_urls:
+                    p_id = post_id_map.get(url)
+                    if p_id:
+                        mark_interaction_processed(f"stalk_{p_id}", "liked_human_browser")
+                
+                if liked_urls:
+                    send_telegram_notification(f"🤝 *Support Mode:* Liked {len(liked_urls)} of your latest posts via Batch Browser.")
+            else:
+                print("No new posts to support.")
                         
         except Exception as e:
             print(f"Stalking failed: {e}")
 
-    # --- 2. RESPOND TO REPLIES (Stays via API since it works) ---
-    # ... Rest of the existing reply logic ...
+    # --- 2. RESPOND TO REPLIES ---
     try:
         source_token = THREADS_ACCESS_TOKEN_SOURCE if THREADS_ACCESS_TOKEN_SOURCE else THREADS_ACCESS_TOKEN_TARGET
         persona_client = ThreadsClient(THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, source_token)
@@ -77,7 +82,6 @@ def process_interactions():
                 reply_text = reply.get('text', '')
                 reply_user = reply.get('username')
                 
-                # Check if it's us
                 try: me = target_client.get_user_profile()['username']
                 except: me = None
                 if reply_user == me: continue
@@ -85,12 +89,8 @@ def process_interactions():
                 print(f"New reply from @{reply_user}: \"{reply_text[:30]}...\"")
                 decision = brain.evaluate_interaction(persona, post_text, reply_text)
                 
-                actions_taken = []
                 if decision.get('like'):
-                    # Trying API for reply likes first
-                    try: 
-                        target_client.like_post(reply_id)
-                        actions_taken.append("liked")
+                    try: target_client.like_post(reply_id)
                     except: pass
                 
                 if decision.get('reply'):
@@ -99,7 +99,6 @@ def process_interactions():
                         container_id = target_client.create_reply_container(reply_id, reply_msg)
                         time.sleep(2) 
                         target_client.publish_container(container_id)
-                        actions_taken.append("replied")
                         mark_interaction_processed(reply_id, f"replied: {reply_msg}")
                         send_telegram_notification(f"💬 *Replied to @{reply_user}:* {reply_msg}")
                     except: pass
