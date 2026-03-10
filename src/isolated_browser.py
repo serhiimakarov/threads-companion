@@ -2,65 +2,66 @@ import sys
 import os
 import time
 import json
-from playwright.sync_api import sync_playwright
+import asyncio
+from playwright.async_api import async_playwright
 
-def run_isolated_batch(urls, state_path):
-    print(f"🌐 Isolated Browser: Starting batch for {len(urls)} posts...")
+async def run_isolated_batch(urls, state_path):
+    print(f"🌐 Isolated Browser (Async): Starting batch for {len(urls)} posts...")
     liked = []
     
-    # Check if state file exists
     if not os.path.exists(state_path):
         print(f"❌ State file not found at {state_path}")
         return
 
     try:
-        with sync_playwright() as p:
-            print("🚀 Launching Chromium with Pi-optimized flags...")
-            # We add --no-sandbox because RPi/Linux often needs it
-            browser = p.chromium.launch(
+        async with async_playwright() as p:
+            print("🚀 Launching Chromium (Async Mode)...")
+            # aarch64 often needs specific flags to behave
+            browser = await p.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+                args=[
+                    "--no-sandbox", 
+                    "--disable-setuid-sandbox", 
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu"
+                ]
             )
             
-            context = browser.new_context(
+            context = await browser.new_context(
                 storage_state=state_path,
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
-            page = context.new_page()
+            page = await context.new_page()
             
             for url in urls:
                 try:
                     print(f"👉 Visiting: {url}")
-                    # Increase timeout for slow RPi
-                    page.goto(url, timeout=90000, wait_until="networkidle")
-                    time.sleep(5)
+                    # Extended timeout for RPi processing
+                    await page.goto(url, timeout=120000, wait_until="domcontentloaded")
+                    await asyncio.sleep(7) # Extra time for Threads JS to settle
                     
-                    # Try to find Like button
+                    # Detection logic
                     like_btn = page.locator('div[role="button"]:has(svg[aria-label="Like"])').first
                     unlike_btn = page.locator('svg[aria-label="Unlike"]').first
                     
-                    if unlike_btn.is_visible():
+                    if await unlike_btn.is_visible():
                         print("✅ Already liked.")
                         liked.append(url)
-                    elif like_btn.is_visible():
-                        like_btn.click()
+                    elif await like_btn.is_visible():
+                        await like_btn.click()
                         print("❤️ Clicked Like.")
-                        time.sleep(2)
+                        await asyncio.sleep(3)
                         liked.append(url)
                     else:
-                        print("⚠️ Could not find like button UI.")
+                        print("⚠️ UI not matching (Like button missing).")
                         
                 except Exception as e:
                     print(f"⚠️ Error on {url}: {e}")
             
-            browser.close()
+            await browser.close()
     except Exception as e:
         print(f"❌ Fatal isolated error: {e}")
-        # Detailed diagnostic for user
-        if "executable" in str(e).lower():
-            print("💡 Hint: Playwright browser binaries not found. Try: playwright install chromium")
     
-    # Return JSON of liked URLs
     print(f"RESULT_JSON:{json.dumps(liked)}")
 
 if __name__ == "__main__":
@@ -69,4 +70,9 @@ if __name__ == "__main__":
     
     state_file = sys.argv[1]
     post_urls = sys.argv[2:]
-    run_isolated_batch(post_urls, state_file)
+    
+    # Run the async loop
+    try:
+        asyncio.run(run_isolated_batch(post_urls, state_file))
+    except KeyboardInterrupt:
+        pass
