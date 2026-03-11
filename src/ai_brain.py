@@ -96,6 +96,21 @@ class AIBrain:
         except:
             return "Minimalist futuristic technology and DIY electronics."
 
+    def generate_mention_post(self, persona, target_username, post_context):
+        prompt = f"""
+        Persona: {persona}
+        Target User: @{target_username}
+        Their Content: "{post_context}"
+        
+        TASK: Write a very short Threads post (max 200 chars) mentioning @{target_username}.
+        Be smart, ask for their opinion, or give a tech-compliment.
+        Goal: Start a conversation. Plain English. No hashtags.
+        """
+        try:
+            return self._generate(prompt).replace('"', '')
+        except:
+            return f"Hey @{target_username}, really interesting insights! What's your take on the current state of automation?"
+
     def generate_post(self, persona, context=None, examples=None):
         prompt = f"""
         Persona: {persona}
