@@ -1,8 +1,35 @@
 import datetime
 import random
 import sqlite3
+import base64
+import requests
 from datetime import timedelta
-from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH
+from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH, IMGBB_API_KEY
+
+def upload_to_imgbb(image_url):
+    if not IMGBB_API_KEY:
+        print("⚠️ IMGBB_API_KEY missing. Skipping image upload.")
+        return None
+    
+    try:
+        # 1. Download from source (e.g. Pollinations)
+        img_res = requests.get(image_url)
+        if img_res.status_code != 200:
+            print(f"⚠️ Failed to download image from source: {img_res.status_code}")
+            return None
+            
+        img_data = img_res.content
+        # 2. Upload to ImgBB
+        url = "https://api.imgbb.com/1/upload"
+        payload = {
+            "key": IMGBB_API_KEY,
+            "image": base64.b64encode(img_data).decode('utf-8'),
+        }
+        res = requests.post(url, data=payload)
+        return res.json()['data']['url']
+    except Exception as e:
+        print(f"❌ ImgBB Upload Error: {e}")
+        return None
 
 def run_agent(dry_run=False):
     from src.threads_client import ThreadsClient
@@ -19,12 +46,12 @@ def run_agent(dry_run=False):
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         one_day_from_now = datetime.datetime.now() + timedelta(days=1)
-        cursor.execute('SELECT COUNT(*) FROM scheduled_posts WHERE status = "pending" AND scheduled_time < ?', (one_day_from_now,))
+        cursor.execute('SELECT COUNT(*) FROM scheduled_posts WHERE status IN ("pending", "pending_approval") AND scheduled_time < ?', (one_day_from_now,))
         pending_count = cursor.fetchone()[0]
         conn.close()
 
-        if pending_count > 0:
-            print(f"🛡️ Spam Protection: {pending_count} posts already scheduled for the next 24h. Skipping strategy session.")
+        if pending_count >= 3:
+            print(f"🛡️ Spam Protection: {pending_count} posts already scheduled. Skipping strategy session.")
             return
 
     if not THREADS_ACCESS_TOKEN_TARGET:
@@ -71,9 +98,17 @@ def run_agent(dry_run=False):
                 image_prompt = brain.generate_image_prompt(f"{content} Theme: {theme}")
                 import urllib.parse
                 encoded_prompt = urllib.parse.quote(image_prompt)
-                # Pollinations.ai provides a direct image link
-                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}"
-                print(f"🖼️ Generated Image Prompt: {image_prompt}")
+                
+                # Link from Pollinations
+                raw_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}"
+                
+                if not dry_run:
+                    print(f"🖼️ Uploading generated image to ImgBB...")
+                    image_url = upload_to_imgbb(raw_url)
+                else:
+                    image_url = raw_url
+                
+                print(f"🖼️ Image Ready: {image_url}")
 
             target_time = datetime.datetime.strptime(slot['time'], "%H:%M").time()
             now = datetime.datetime.now()
@@ -85,10 +120,8 @@ def run_agent(dry_run=False):
             jitter = random.randint(-15, 15)
             scheduled_dt += timedelta(minutes=jitter)
 
-            # ONLY THREADS
             if not dry_run:
                 add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
-                # Update image_url separately if needed or update add_scheduled_post signature
                 if image_url:
                     conn = sqlite3.connect(DATABASE_PATH)
                     cursor = conn.cursor()
@@ -108,7 +141,7 @@ def run_agent(dry_run=False):
             print(f"❌ Failed to schedule slot: {e}")
 
     if scheduled_count > 0 and not dry_run:
-        send_telegram_notification(f"🧠 *AI Strategy Session Complete*\n\nCleaned the slate and decided on *{scheduled_count}* new posts for the next 24 hours.")
+        send_telegram_notification(f"🧠 *AI Strategy Session Complete*\n\nDecided on *{scheduled_count}* new posts for the next 24 hours. Waiting for your approval.")
 
 if __name__ == "__main__":
     run_agent()

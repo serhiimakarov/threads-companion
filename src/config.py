@@ -34,5 +34,8 @@ DATABASE_PATH = os.getenv('DATABASE_PATH', 'threads_scheduler.db')
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+# Image Hosting
+IMGBB_API_KEY = os.getenv('IMGBB_API_KEY')
+
 if not THREADS_APP_ID or not THREADS_APP_SECRET:
     logger.warning("THREADS_APP_ID or THREADS_APP_SECRET environment variables are not set.")
