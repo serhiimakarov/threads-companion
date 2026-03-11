@@ -16,6 +16,30 @@ class BrowserEngine:
     def is_authenticated(self):
         return os.path.exists(self.state_path)
 
+    def _get_cookies_dict(self):
+        if not self.is_authenticated(): return {}
+        try:
+            with open(self.state_path, 'r') as f:
+                state = json.load(f)
+            return {c['name']: c['value'] for c in state.get('cookies', [])}
+        except:
+            return {}
+
+    def _get_headers(self, cookies, lsd_token=''):
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "X-IG-App-ID": "238280524082381",
+            "X-FB-LSD": lsd_token if lsd_token else cookies.get('lsd', ''),
+            "Origin": "https://www.threads.com",
+            "Referer": "https://www.threads.com/",
+            "X-Requested-With": "XMLHttpRequest"
+        }
+        csrf = cookies.get('csrftoken')
+        if csrf: headers["X-CSRFToken"] = csrf
+        return headers
+
     def _create_curl_cookie_file(self):
         if not self.is_authenticated(): return None
         try:
