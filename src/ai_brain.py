@@ -8,7 +8,7 @@ class AIBrain:
     def __init__(self):
         self.provider = AI_PROVIDER
         self.gemini_client = None
-        self.gemini_model_id = 'gemini-1.5-flash'
+        self.gemini_model_id = 'gemini-2.0-flash'
         
         if self.provider == 'gemini' and GEMINI_API_KEY:
             try:
