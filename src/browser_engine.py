@@ -32,6 +32,16 @@ class BrowserEngine:
             return tmp_file.name
         except: return None
 
+    def _get_csrf_from_jar(self, jar_path):
+        """Extracts the latest csrftoken from the Netscape cookie jar."""
+        try:
+            with open(jar_path, 'r') as f:
+                content = f.read()
+                match = re.search(r'csrftoken\t(\S+)', content)
+                if match: return match.group(1)
+        except: pass
+        return ""
+
     def like_posts_batch(self, post_urls):
         if not self.is_authenticated(): return []
         cookie_jar = self._create_curl_cookie_file()
@@ -44,27 +54,26 @@ class BrowserEngine:
             try:
                 print(f"👉 Target: {url}")
                 
-                # 1. Fetch page to get Media ID and LSD
+                # 1. GET page to refresh tokens
                 get_cmd = ["curl", "-s", "-L", "-b", cookie_jar, "-c", cookie_jar, "-H", f"User-Agent: {user_agent}", url]
                 html = subprocess.run(get_cmd, capture_output=True, text=True).stdout
                 
-                # UNIVERSAL REGEX EXTRACTION
+                # Extract Media ID and LSD
                 m_id = None
-                # Pattern 1: Any 17-19 digit number near "Barcelona" or "Post"
-                match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html)
-                if not match: match = re.search(r'\"post_id\":\"?(\d{17,20})\"?', html)
-                if not match: match = re.search(r'\"id\":\"?(\d{17,20})\"?', html)
+                m_match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html)
+                if not m_match: m_match = re.search(r'\"post_id\":\"?(\d{17,20})\"?', html)
+                if m_match: m_id = m_match.group(1)
                 
-                if match:
-                    m_id = match.group(1)
-                    print(f"🎯 Extracted Media ID: {m_id}")
-                
-                # Extract LSD
                 lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', html)
                 lsd = lsd_match.group(1) if lsd_match else ""
                 
+                # Extract latest CSRF from updated jar
+                csrf = self._get_csrf_from_jar(cookie_jar)
+                
                 if m_id:
+                    print(f"🎯 ID: {m_id} | CSRF: {csrf[:5]}... | LSD: {lsd[:5]}...")
                     print(f"❤️ Sending POST like...")
+                    
                     post_cmd = [
                         "curl", "-s", "-X", "POST",
                         "https://www.threads.net/api/v1/web/threads/like/",
@@ -72,6 +81,7 @@ class BrowserEngine:
                         "-H", f"User-Agent: {user_agent}",
                         "-H", "X-IG-App-ID: 238280524082381",
                         "-H", f"X-FB-LSD: {lsd}",
+                        "-H", f"X-CSRFToken: {csrf}",
                         "-H", "X-Requested-With: XMLHttpRequest",
                         "-H", "Origin: https://www.threads.net",
                         "-H", f"Referer: {url}",
@@ -81,16 +91,14 @@ class BrowserEngine:
                     
                     resp = subprocess.run(post_cmd, capture_output=True, text=True).stdout
                     if '"status":"ok"' in resp:
-                        print(f"✅ SUCCESS: Like recorded!")
+                        print(f"✅ SUCCESS: Like confirmed!")
                         liked_urls.append(url)
                     else:
                         print(f"⚠️ Rejection: {resp[:100]}")
-                else:
-                    print("⚠️ Could not find Numeric Media ID on page.")
+                else: print("⚠️ Media ID not found.")
                 
                 time.sleep(5)
-            except Exception as e:
-                print(f"❌ Error: {e}")
+            except Exception as e: print(f"❌ Error: {e}")
         
         if os.path.exists(cookie_jar): os.remove(cookie_jar)
         return liked_urls
