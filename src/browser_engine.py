@@ -3,7 +3,7 @@ import json
 import subprocess
 import re
 import time
-import requests
+import tempfile
 
 class BrowserEngine:
     def __init__(self, state_path=None):
@@ -16,73 +16,87 @@ class BrowserEngine:
     def is_authenticated(self):
         return os.path.exists(self.state_path)
 
-    def _get_cookies_dict(self):
-        if not self.is_authenticated(): return {}
+    def _create_curl_cookie_file(self):
+        if not self.is_authenticated(): return None
         try:
             with open(self.state_path, 'r') as f:
                 state = json.load(f)
-            return {c['name']: c['value'] for c in state.get('cookies', [])}
-        except: return {}
+            tmp_file = tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.txt')
+            tmp_file.write("# Netscape HTTP Cookie File\n")
+            for c in state.get('cookies', []):
+                domain = c['domain']
+                secure = "TRUE" if c['secure'] else "FALSE"
+                expires = int(c['expires']) if c['expires'] > 0 else 0
+                tmp_file.write(f"{domain}\tTRUE\t{c['path']}\t{secure}\t{expires}\t{c['name']}\t{c['value']}\n")
+            tmp_file.close()
+            return tmp_file.name
+        except: return None
+
+    def _get_csrf_from_jar(self, jar_path):
+        try:
+            with open(jar_path, 'r') as f:
+                content = f.read()
+                match = re.search(r'csrftoken\t(\S+)', content)
+                if match: return match.group(1)
+        except: pass
+        return ""
 
     def like_posts_batch(self, post_urls):
         if not self.is_authenticated(): return []
+        cookie_jar = self._create_curl_cookie_file()
+        if not cookie_jar: return []
         
-        cookies = self._get_cookies_dict()
-        session = requests.Session()
-        for n, v in cookies.items():
-            session.cookies.set(n, v, domain=".threads.net")
-
         liked_urls = []
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         
         for url in post_urls:
             try:
                 print(f"👉 Target: {url}")
-                # 1. Use curl to get the latest page context (reliable GET)
-                cookie_str = "; ".join([f"{k}={v}" for k,v in cookies.items()])
-                get_cmd = ["curl", "-s", "-L", "--cookie", cookie_str, "-H", f"User-Agent: {user_agent}", url]
+                # 1. GET page with HTTP/2
+                get_cmd = ["curl", "-s", "-L", "--http2", "-b", cookie_jar, "-c", cookie_jar, "-H", f"User-Agent: {user_agent}", url]
                 html = subprocess.run(get_cmd, capture_output=True, text=True).stdout
                 
-                # Extract tokens
                 m_id = None
                 m_match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html)
                 if not m_match: m_match = re.search(r'\"post_id\":\"?(\d{17,20})\"?', html)
                 if m_match: m_id = m_match.group(1)
                 
                 lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', html)
-                lsd = lsd_match.group(1) if lsd_match else cookies.get('lsd', '')
+                lsd = lsd_match.group(1) if lsd_match else ""
+                csrf = self._get_csrf_from_jar(cookie_jar)
                 
                 if m_id:
-                    print(f"🎯 ID Found: {m_id}. Sending Hybrid POST like...")
-                    # Update session with any fresh cookies from curl (if we had a jar, but let's try raw)
+                    print(f"🎯 ID: {m_id} | LSD: {lsd[:5]}... | CSRF: {csrf[:5]}...")
                     
-                    headers = {
-                        "User-Agent": user_agent,
-                        "X-IG-App-ID": "238280524082381",
-                        "X-FB-LSD": lsd,
-                        "X-CSRFToken": cookies.get('csrftoken', ''),
-                        "X-Requested-With": "XMLHttpRequest",
-                        "Origin": "https://www.threads.net",
-                        "Referer": url,
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    }
+                    # 2. POST like with HTTP/2 and ALL headers
+                    post_cmd = [
+                        "curl", "-s", "--http2", "-X", "POST",
+                        "https://www.threads.net/api/v1/web/threads/like/",
+                        "-b", cookie_jar, "-c", cookie_jar,
+                        "-H", f"User-Agent: {user_agent}",
+                        "-H", "X-IG-App-ID: 238280524082381",
+                        "-H", "X-ASBD-ID: 129477",
+                        "-H", "X-IG-WWW-Claim: 0",
+                        "-H", f"X-FB-LSD: {lsd}",
+                        "-H", f"X-CSRFToken: {csrf}",
+                        "-H", "X-Requested-With: XMLHttpRequest",
+                        "-H", "Origin: https://www.threads.net",
+                        "-H", f"Referer: {url}",
+                        "-H", "Content-Type: application/x-www-form-urlencoded",
+                        "--data-raw", f"media_id={m_id}&lsd={lsd}"
+                    ]
                     
-                    payload = {"media_id": m_id, "lsd": lsd}
-                    
-                    resp = session.post("https://www.threads.net/api/v1/web/threads/like/", data=payload, headers=headers, timeout=15)
-                    
-                    if resp.status_code == 200 and '"status":"ok"' in resp.text:
-                        print(f"✅ SUCCESS: Hybrid Like Recorded!")
+                    resp = subprocess.run(post_cmd, capture_output=True, text=True).stdout
+                    if '"status":"ok"' in resp:
+                        print(f"✅ SUCCESS: CURL-HTTP2 Like Confirmed!")
                         liked_urls.append(url)
                     else:
-                        print(f"⚠️ Hybrid rejection ({resp.status_code}): {resp.text[:100]}")
-                else:
-                    print("⚠️ ID Resolution failed.")
-                
+                        print(f"⚠️ Rejection: {resp[:100]}")
+                else: print("⚠️ ID not found.")
                 time.sleep(5)
-            except Exception as e:
-                print(f"❌ Hybrid Error: {e}")
-                
+            except Exception as e: print(f"❌ Error: {e}")
+        
+        if os.path.exists(cookie_jar): os.remove(cookie_jar)
         return liked_urls
 
     def post_comment_web(self, post_url, comment_text):
