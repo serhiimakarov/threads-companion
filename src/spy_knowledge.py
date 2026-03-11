@@ -2,59 +2,59 @@ import requests
 import re
 import time
 import random
+import urllib.parse
 
 class SpyKnowledge:
     def __init__(self, threads_client):
         self.client = threads_client
 
     def find_posts_by_tag(self, tag):
-        print(f"🕵️ SpyKnowledge: Searching for content related to #{tag}...")
+        print(f"🕵️ SpyKnowledge: Searching Google for fresh Threads posts about #{tag}...")
         
-        # Strategy 1: Google Proxy (Very reliable for finding post links)
         try:
-            search_query = f"site:threads.net \"#{tag}\""
-            url = f"https://www.google.com/search?q={search_query}"
-            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
-            res = requests.get(url, headers=headers, timeout=15)
-            # Find threads.net post links (NOT profiles)
-            links = re.findall(r'https://www.threads.net/@[a-zA-Z0-9._]+/post/[a-zA-Z0-9_-]+', res.text)
-            if links:
-                return list(set(links))
-        except: pass
-
-        # Strategy 2: Niche Leaders (Extraction of latest post)
-        niche_profiles = {
-            "python": ["python.learning", "realpython"],
-            "diy": ["hackaday", "raspberrypi"],
-            "indiehacker": ["levelsio", "pieterlevels"]
-        }
-        
-        target_usernames = niche_profiles.get(tag, ["raspberrypi"])
-        found_posts = []
-        
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
-        
-        for username in target_usernames:
-            try:
-                profile_url = f"https://www.threads.net/@{username}"
-                print(f"🧐 Visiting profile: {profile_url} to find latest post...")
-                res = requests.get(profile_url, headers=headers, timeout=15)
-                # Regex to find any post link in the profile HTML
-                post_links = re.findall(rf'\/@{username}\/post\/[a-zA-Z0-9_-]+', res.text)
-                if post_links:
-                    full_url = f"https://www.threads.net{post_links[0]}"
-                    print(f"📍 Found latest post: {full_url}")
-                    found_posts.append(full_url)
-            except: pass
+            # Search for specific post patterns in Google
+            # We look for /post/ links which are guaranteed to be interactive
+            search_query = f"site:threads.net \"#{tag}\" inurl:post"
+            encoded_query = urllib.parse.quote(search_query)
+            url = f"https://www.google.com/search?q={encoded_query}"
             
-        return found_posts
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            res = requests.get(url, headers=headers, timeout=15)
+            
+            # Extract links like threads.net/@user/post/CODE
+            # Google often encodes links, so we look for raw patterns
+            links = re.findall(r'https://www\.threads\.net/@[a-zA-Z0-9._]+/post/[a-zA-Z0-9_-]+', res.text)
+            
+            if not links:
+                # Try to find encoded links in Google's redirect format
+                encoded_links = re.findall(r'url\?q=(https://www\.threads\.net/@[a-zA-Z0-9._]+/post/[a-zA-Z0-9_-]+)', res.text)
+                links = encoded_links
+
+            if links:
+                unique_links = list(set(links))
+                print(f"✅ Google Proxy found {len(unique_links)} fresh posts.")
+                return unique_links
+        except Exception as e:
+            print(f"⚠️ Google Proxy failed: {e}")
+
+        # Emergency Fallback: If Google is blocking us, use a few static reliable posts 
+        # (or just skip to avoid detected automation patterns)
+        print("💡 No links found. Google might be throttling or no fresh posts indexed.")
+        return []
 
     def get_post_text_lightweight(self, url):
         try:
-            res = requests.get(url, timeout=10)
-            # Try to get meta description or title which usually contains post text
+            # We can often get the post text from the page title or meta tags
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            res = requests.get(url, headers=headers, timeout=10)
+            
+            # Threads often puts the post content in the <title> or og:description
             match = re.search(r'<meta property=\"og:description\" content=\"(.*?)\"', res.text)
             if match:
                 return match.group(1)
+            
+            title_match = re.search(r'<title>(.*?)<\/title>', res.text)
+            if title_match:
+                return title_match.group(1).replace("Threads", "").strip()
         except: pass
-        return "A technical post on Threads."
+        return "A technical discussion on Threads."
