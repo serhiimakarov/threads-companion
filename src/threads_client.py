@@ -132,7 +132,13 @@ class ThreadsClient:
             'access_token': self.access_token
         }
         response = requests.post(url, data=data)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"DEBUG: Image container creation failed. Status: {response.status_code}")
+            print(f"DEBUG: Response body: {response.text}")
+            raise e
+            
         container_id = response.json()['id']
         
         # Images need more time to process
