@@ -4,64 +4,52 @@ import time
 import random
 
 class SpyKnowledge:
-    """
-    Module for finding interesting content on Threads without a heavy browser.
-    """
     def __init__(self, threads_client):
         self.client = threads_client
 
     def find_posts_by_tag(self, tag):
-        """
-        Tries to find posts using different strategies.
-        """
         print(f"🕵️ SpyKnowledge: Searching for content related to #{tag}...")
         
-        # Strategy 1: Official API (requires threads_keyword_search)
-        try:
-            results = self.client.search_posts(tag, limit=5)
-            if results and 'data' in results:
-                print("✅ Found posts via official API search.")
-                return [f"https://www.threads.net/@{p['username']}/post/{p['id']}" for p in results['data']]
-        except:
-            print("⚠️ Official API search failed or restricted.")
-
-        # Strategy 2: Google Search Scraper (Lightweight)
-        # Search for: site:threads.net "#python"
+        # Strategy 1: Google Proxy (Very reliable for finding post links)
         try:
             search_query = f"site:threads.net \"#{tag}\""
             url = f"https://www.google.com/search?q={search_query}"
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
             res = requests.get(url, headers=headers, timeout=15)
-            
-            # Find threads.net post links in Google results
+            # Find threads.net post links (NOT profiles)
             links = re.findall(r'https://www.threads.net/@[a-zA-Z0-9._]+/post/[a-zA-Z0-9_-]+', res.text)
             if links:
-                print(f"✅ Found {len(set(links))} posts via Google Proxy.")
                 return list(set(links))
-        except Exception as e:
-            print(f"⚠️ Google Proxy search failed: {e}")
+        except: pass
 
-        # Strategy 3: Niche Leaders (Safe fallback)
-        # Instead of searching, we just visit known profiles in the niche
+        # Strategy 2: Niche Leaders (Extraction of latest post)
         niche_profiles = {
-            "python": ["@python.learning", "@realpython"],
-            "diy": ["@hackaday", "@raspberrypi"],
-            "indiehacker": ["@levelsio", "@pieterlevels"]
+            "python": ["python.learning", "realpython"],
+            "diy": ["hackaday", "raspberrypi"],
+            "indiehacker": ["levelsio", "pieterlevels"]
         }
         
-        target_profiles = niche_profiles.get(tag, ["@raspberrypi"])
-        print(f"💡 Strategy 3: Falling back to niche leaders: {target_profiles}")
+        target_usernames = niche_profiles.get(tag, ["raspberrypi"])
+        found_posts = []
         
-        fallback_links = []
-        for profile in target_profiles:
-            fallback_links.append(f"https://www.threads.net/{profile}")
+        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+        
+        for username in target_usernames:
+            try:
+                profile_url = f"https://www.threads.net/@{username}"
+                print(f"🧐 Visiting profile: {profile_url} to find latest post...")
+                res = requests.get(profile_url, headers=headers, timeout=15)
+                # Regex to find any post link in the profile HTML
+                post_links = re.findall(rf'\/@{username}\/post\/[a-zA-Z0-9_-]+', res.text)
+                if post_links:
+                    full_url = f"https://www.threads.net{post_links[0]}"
+                    print(f"📍 Found latest post: {full_url}")
+                    found_posts.append(full_url)
+            except: pass
             
-        return fallback_links
+        return found_posts
 
     def get_post_text_lightweight(self, url):
-        """
-        Extracts at least some context from a post URL without a browser.
-        """
         try:
             res = requests.get(url, timeout=10)
             # Try to get meta description or title which usually contains post text

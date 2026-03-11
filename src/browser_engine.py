@@ -75,7 +75,13 @@ class BrowserEngine:
                 m_id = media_id_match.group(1)
                 lsd_t = lsd_match.group(1) if lsd_match else cookies.get('lsd', '')
                 
-                print(f"💬 Posting real comment to {m_id}...")
+                # Double check m_id (it must be long numeric string)
+                if not m_id.isdigit() or len(m_id) < 10:
+                    # Alternative: extract from metadata
+                    alt_id = re.search(r'\"media_id\":\"(\d+)\"', res.text)
+                    if alt_id: m_id = alt_id.group(1)
+                
+                print(f"💬 Posting real comment to Media ID: {m_id}...")
                 
                 # Threads Web Reply API
                 reply_url = "https://www.threads.net/api/v1/web/threads/reply/"
