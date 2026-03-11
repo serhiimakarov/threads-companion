@@ -84,18 +84,32 @@ class AIBrain:
         except:
             return "Great post! Always interesting to see these kind of insights."
 
+    def generate_image_prompt(self, post_text):
+        prompt = f"""
+        Post Text: "{post_text}"
+        TASK: Generate a simple, artistic image prompt for an AI image generator (like DALL-E or Midjourney).
+        The image should represent the theme of the post.
+        Return ONLY the prompt string, no meta-text. Max 100 characters.
+        """
+        try:
+            return self._generate(prompt)
+        except:
+            return "Minimalist futuristic technology and DIY electronics."
+
     def generate_post(self, persona, context=None, examples=None):
         prompt = f"""
         Persona: {persona}
         Context: {context}
         Examples: {examples}
         TASK: Create a Threads post that drives replies. 
+        Return JSON ONLY: {{"text": "your post text", "wants_image": bool, "image_theme": "short theme"}}
         No hashtags. End with a question. Plain English. Max 400 chars.
         """
         try:
-            return self._generate(prompt).replace('"', '')
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
         except:
-            return None
+            return {"text": None, "wants_image": False, "image_theme": None}
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""

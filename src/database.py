@@ -16,15 +16,18 @@ def init_db():
             scheduled_time TIMESTAMP NOT NULL,
             platform TEXT DEFAULT 'threads',
             status TEXT DEFAULT 'pending', -- pending, posted, failed
+            image_url TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
-    # Migration for existing table if platform column doesn't exist
+    # Migration for existing table
     try:
         cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN platform TEXT DEFAULT 'threads'")
-    except sqlite3.OperationalError:
-        pass # Already exists
+    except: pass
+    try:
+        cursor.execute("ALTER TABLE scheduled_posts ADD COLUMN image_url TEXT")
+    except: pass
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS stats (
@@ -84,7 +87,7 @@ def get_pending_approval():
 def get_pending_posts():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, content, platform FROM scheduled_posts WHERE status = 'pending' AND scheduled_time <= ?", (datetime.now(),))
+    cursor.execute("SELECT id, content, platform, image_url FROM scheduled_posts WHERE status = 'pending' AND scheduled_time <= ?", (datetime.now(),))
     posts = cursor.fetchall()
     conn.close()
     return posts

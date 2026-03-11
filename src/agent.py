@@ -60,9 +60,21 @@ def run_agent(dry_run=False):
     scheduled_count = 0
     for slot in decisions.get('slots', []):
         try:
-            content = brain.generate_post(persona, context=slot['topic'], examples=top_posts_str)
+            ai_response = brain.generate_post(persona, context=slot['topic'], examples=top_posts_str)
+            content = ai_response.get('text')
             if not content: continue
             
+            # --- IMAGE GENERATION ---
+            image_url = None
+            if ai_response.get('wants_image'):
+                theme = ai_response.get('image_theme', slot['topic'])
+                image_prompt = brain.generate_image_prompt(f"{content} Theme: {theme}")
+                import urllib.parse
+                encoded_prompt = urllib.parse.quote(image_prompt)
+                # Pollinations.ai provides a direct image link
+                image_url = f"https://pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={random.randint(1, 99999)}"
+                print(f"🖼️ Generated Image Prompt: {image_prompt}")
+
             target_time = datetime.datetime.strptime(slot['time'], "%H:%M").time()
             now = datetime.datetime.now()
             scheduled_dt = datetime.datetime.combine(now.date(), target_time)
@@ -76,11 +88,19 @@ def run_agent(dry_run=False):
             # ONLY THREADS
             if not dry_run:
                 add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
+                # Update image_url separately if needed or update add_scheduled_post signature
+                if image_url:
+                    conn = sqlite3.connect(DATABASE_PATH)
+                    cursor = conn.cursor()
+                    cursor.execute('UPDATE scheduled_posts SET image_url = ? WHERE content = ? AND scheduled_time = ?', (image_url, content, scheduled_dt))
+                    conn.commit()
+                    conn.close()
                 print(f"✅ Scheduled for Approval: \"{content[:30]}...\" at {scheduled_dt}")
             else:
                 print(f"\n🧪 [DRY RUN] Generated for {scheduled_dt}:")
                 print("-" * 60)
                 print(content)
+                if image_url: print(f"🖼️ IMAGE: {image_url}")
                 print("-" * 60)
             scheduled_count += 1
             

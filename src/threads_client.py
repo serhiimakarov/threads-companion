@@ -89,6 +89,23 @@ class ThreadsClient:
         response.raise_for_status()
         return response.json()['id']
 
+    def quote_post(self, quote_post_id, text):
+        if not self.user_id: self.get_user_profile()
+        url = f"{self.BASE_URL}/{self.user_id}/threads"
+        data = {
+            'media_type': 'TEXT',
+            'text': text,
+            'quote_post_id': quote_post_id,
+            'access_token': self.access_token
+        }
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        container_id = response.json()['id']
+        
+        # Wait for container and publish
+        time.sleep(3)
+        return self.publish_container(container_id)
+
     def post_text(self, text):
         if not self.user_id: self.get_user_profile()
         url = f"{self.BASE_URL}/{self.user_id}/threads"
@@ -103,6 +120,23 @@ class ThreadsClient:
         
         # Wait for container and publish
         time.sleep(3)
+        return self.publish_container(container_id)
+
+    def post_image(self, image_url, caption):
+        if not self.user_id: self.get_user_profile()
+        url = f"{self.BASE_URL}/{self.user_id}/threads"
+        data = {
+            'media_type': 'IMAGE',
+            'image_url': image_url,
+            'text': caption,
+            'access_token': self.access_token
+        }
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        container_id = response.json()['id']
+        
+        # Images need more time to process
+        time.sleep(10)
         return self.publish_container(container_id)
 
     def publish_container(self, container_id):

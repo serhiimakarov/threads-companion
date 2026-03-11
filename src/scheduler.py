@@ -26,12 +26,15 @@ def run_scheduler():
             return
 
         for post in posts:
-            post_id, content, platform = post
+            post_id, content, platform, image_url = post
             print(f"Publishing post {post_id} to {platform}: {content[:30]}...")
             
             try:
                 if platform == 'threads':
-                    published_id = threads_client.post_text(content)
+                    if image_url:
+                        published_id = threads_client.post_image(image_url, content)
+                    else:
+                        published_id = threads_client.post_text(content)
                 else:
                     print(f"Skipping unknown platform: {platform}")
                     continue
