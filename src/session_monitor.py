@@ -1,6 +1,7 @@
-import requests
+import subprocess
 import json
 import os
+import re
 from src.browser_engine import BrowserEngine
 from src.notifications import send_telegram_notification
 
@@ -10,53 +11,61 @@ class SessionMonitor:
 
     def check_session_health(self):
         """
-        Verifies if the current cookie session is still valid.
-        Returns: True (Healthy), False (Expired/Invalid)
+        Verifies if the current cookie session is still valid using curl.
         """
         if not self.browser.is_authenticated():
             print("❌ Session Monitor: No auth file found.")
             return False
 
-        cookies = self.browser._get_cookies_dict()
-        headers = self.browser._get_headers(cookies)
+        # We use curl because requests is often blocked or gets 404
+        cookie_jar = self.browser._create_curl_cookie_file()
+        if not cookie_jar: return False
         
-        # We use the current_user endpoint which returns 404/401 if not logged in
-        url = "https://www.threads.net/api/v1/web/accounts/current_user/"
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        url = "https://www.threads.com/api/v1/web/accounts/current_user/"
         
         try:
-            res = requests.get(url, cookies=cookies, headers=headers, timeout=15)
+            cmd = [
+                "curl", "-s", "-L", "--http2",
+                "-b", cookie_jar,
+                "-H", f"User-Agent: {user_agent}",
+                "-H", "X-Requested-With: XMLHttpRequest",
+                url
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            output = result.stdout
             
-            # If we get a JSON with user info, we are good
-            if res.status_code == 200:
-                data = res.json()
-                if data.get('user'):
-                    print(f"✅ Session Healthy: @{data['user']['username']}")
+            # Clean up cookie jar immediately
+            if os.path.exists(cookie_jar): os.remove(cookie_jar)
+
+            if result.returncode == 0 and '"username"' in output:
+                try:
+                    data = json.loads(output)
+                    if data.get('user'):
+                        print(f"✅ Session Healthy: @{data['user']['username']}")
+                        return True
+                except:
+                    # If it's not JSON but has username, it might be valid HTML with data
+                    print("✅ Session Healthy (Found username in output)")
                     return True
             
-            # If we are redirected to login or get error
-            print(f"⚠️ Session Invalid. Status: {res.status_code}")
+            print(f"⚠️ Session Invalid or Response Error. Output sample: {output[:100]}")
             return False
             
         except Exception as e:
             print(f"❌ Session Monitor Error: {e}")
+            if os.path.exists(cookie_jar): os.remove(cookie_jar)
             return False
 
     def run_health_check(self):
-        """
-        Runs check and notifies user if session died.
-        """
         is_healthy = self.check_session_health()
-        
-        # Check if we already notified about failure to avoid spam
-        # We can use a simple flag file
         flag_file = "data/session_dead.flag"
         
         if not is_healthy:
             if not os.path.exists(flag_file):
-                send_telegram_notification("🚨 *CRITICAL: Threads Session Expired!*\n\nThe bot cannot like or comment. Please refresh cookies via SSH Tunnel immediately.")
+                send_telegram_notification("🚨 *CRITICAL: Threads Session Expired!*\n\nThe bot cannot like or comment. Please refresh cookies via SSH Tunnel.")
                 with open(flag_file, 'w') as f: f.write("dead")
         else:
-            # If healthy, remove flag if it exists
             if os.path.exists(flag_file):
                 os.remove(flag_file)
                 send_telegram_notification("✅ *System Restored:* Threads Session is back online.")
