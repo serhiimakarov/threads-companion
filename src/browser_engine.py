@@ -32,55 +32,44 @@ class BrowserEngine:
             return tmp_file.name
         except: return None
 
-    def _get_media_id_via_json(self, url, cookie_jar):
-        """Uses the __a=1 endpoint to get structured JSON data for a post."""
-        shortcode = None
-        if "/t/" in url: shortcode = url.split("/t/")[1].split("/")[0].split("?")[0]
-        elif "/post/" in url: shortcode = url.split("/post/")[1].split("/")[0].split("?")[0]
-        
-        if not shortcode: return None
-        
-        # Threads internal JSON data endpoint
-        json_url = f"https://www.threads.net/t/{shortcode}/?__a=1&__d=dis"
-        headers = ["-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "-H", "X-Requested-With: XMLHttpRequest"]
-        
-        cmd = ["curl", "-s", "-L", "-b", cookie_jar] + headers + [json_url]
-        res = subprocess.run(cmd, capture_output=True, text=True).stdout
-        
-        try:
-            data = json.loads(res)
-            # Media ID is in graphql -> shortcode_media -> id
-            m_id = data.get('graphql', {}).get('shortcode_media', {}).get('id')
-            if m_id: return m_id
-        except: pass
-        
-        # Regex fallback on the JSON response
-        m_id_match = re.search(r'\"id\":\"(\d{17,20})\"', res)
-        return m_id_match.group(1) if m_id_match else None
-
     def like_posts_batch(self, post_urls):
         if not self.is_authenticated(): return []
         cookie_jar = self._create_curl_cookie_file()
         if not cookie_jar: return []
         
         liked_urls = []
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        
         for url in post_urls:
             try:
-                print(f"👉 Resolving ID for: {url}")
-                m_id = self._get_media_id_via_json(url, cookie_jar)
+                print(f"👉 Target: {url}")
+                
+                # 1. Fetch page to get Media ID and LSD
+                get_cmd = ["curl", "-s", "-L", "-b", cookie_jar, "-c", cookie_jar, "-H", f"User-Agent: {user_agent}", url]
+                html = subprocess.run(get_cmd, capture_output=True, text=True).stdout
+                
+                # UNIVERSAL REGEX EXTRACTION
+                m_id = None
+                # Pattern 1: Any 17-19 digit number near "Barcelona" or "Post"
+                match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html)
+                if not match: match = re.search(r'\"post_id\":\"?(\d{17,20})\"?', html)
+                if not match: match = re.search(r'\"id\":\"?(\d{17,20})\"?', html)
+                
+                if match:
+                    m_id = match.group(1)
+                    print(f"🎯 Extracted Media ID: {m_id}")
+                
+                # Extract LSD
+                lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', html)
+                lsd = lsd_match.group(1) if lsd_match else ""
                 
                 if m_id:
-                    print(f"❤️ Liking Media ID: {m_id}...")
-                    # Get LSD from the regular page (JSON endpoint might not have it)
-                    page_html = subprocess.run(["curl", "-s", "-b", cookie_jar, url], capture_output=True, text=True).stdout
-                    lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', page_html)
-                    lsd = lsd_match.group(1) if lsd_match else ""
-                    
+                    print(f"❤️ Sending POST like...")
                     post_cmd = [
                         "curl", "-s", "-X", "POST",
                         "https://www.threads.net/api/v1/web/threads/like/",
                         "-b", cookie_jar, "-c", cookie_jar,
-                        "-H", "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        "-H", f"User-Agent: {user_agent}",
                         "-H", "X-IG-App-ID: 238280524082381",
                         "-H", f"X-FB-LSD: {lsd}",
                         "-H", "X-Requested-With: XMLHttpRequest",
@@ -92,13 +81,16 @@ class BrowserEngine:
                     
                     resp = subprocess.run(post_cmd, capture_output=True, text=True).stdout
                     if '"status":"ok"' in resp:
-                        print(f"✅ SUCCESS!")
+                        print(f"✅ SUCCESS: Like recorded!")
                         liked_urls.append(url)
-                    else: print(f"⚠️ Rejection: {resp[:50]}")
-                else: print("⚠️ Media ID Resolution failed.")
+                    else:
+                        print(f"⚠️ Rejection: {resp[:100]}")
+                else:
+                    print("⚠️ Could not find Numeric Media ID on page.")
                 
                 time.sleep(5)
-            except Exception as e: print(f"❌ Error: {e}")
+            except Exception as e:
+                print(f"❌ Error: {e}")
         
         if os.path.exists(cookie_jar): os.remove(cookie_jar)
         return liked_urls
