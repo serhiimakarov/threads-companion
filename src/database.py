@@ -64,14 +64,22 @@ def mark_interaction_processed(reply_id, action):
     conn.commit()
     conn.close()
 
-def add_scheduled_post(content, scheduled_time, platform='threads'):
+def add_scheduled_post(content, scheduled_time, platform='threads', status='pending'):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO scheduled_posts (content, scheduled_time, platform) VALUES (?, ?, ?)', (content, scheduled_time, platform))
+    cursor.execute('INSERT INTO scheduled_posts (content, scheduled_time, platform, status) VALUES (?, ?, ?, ?)', (content, scheduled_time, platform, status))
     conn.commit()
     post_id = cursor.lastrowid
     conn.close()
     return post_id
+
+def get_pending_approval():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, content, platform, scheduled_time FROM scheduled_posts WHERE status = 'pending_approval' ORDER BY scheduled_time ASC")
+    posts = cursor.fetchall()
+    conn.close()
+    return posts
 
 def get_pending_posts():
     conn = get_connection()

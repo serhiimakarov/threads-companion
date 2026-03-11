@@ -75,8 +75,8 @@ def run_agent(dry_run=False):
 
             # ONLY THREADS
             if not dry_run:
-                add_scheduled_post(content, scheduled_dt, platform='threads')
-                print(f"✅ Scheduled: \"{content[:30]}...\" at {scheduled_dt}")
+                add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
+                print(f"✅ Scheduled for Approval: \"{content[:30]}...\" at {scheduled_dt}")
             else:
                 print(f"\n🧪 [DRY RUN] Generated for {scheduled_dt}:")
                 print("-" * 60)

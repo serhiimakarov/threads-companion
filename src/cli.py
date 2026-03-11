@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import urllib.parse
 from dotenv import load_dotenv
-from src.database import init_db, add_scheduled_post, get_stats, get_all_pending
+from src.database import init_db, add_scheduled_post, get_stats, get_all_pending, get_pending_approval, mark_post_status
 from src.scheduler import run_scheduler
 from src.threads_client import ThreadsClient
 
@@ -29,6 +29,10 @@ def main():
     # List posts
     subparsers.add_parser("list", help="List pending posts")
     
+    # Approve post
+    approve_parser = subparsers.add_parser("approve", help="Approve a post for publishing")
+    approve_parser.add_argument("id", type=int, help="The ID of the post to approve")
+
     # Delete post
     delete_parser = subparsers.add_parser("delete", help="Delete a scheduled post by ID")
     delete_parser.add_argument("id", type=int, help="The ID of the post to delete")
@@ -61,19 +65,37 @@ def main():
             print("Invalid date format. Use YYYY-MM-DD HH:MM")
 
     elif args.command == "list":
-        posts = get_all_pending()
-        if not posts:
-            print("📭 No pending posts.")
+        pending = get_all_pending()
+        approval = get_pending_approval()
+        
+        if not pending and not approval:
+            print("📭 No posts in queue.")
         else:
-            print("\n📅 SCHEDULED POSTS QUEUE")
-            print("=" * 90)
-            for post in posts:
-                post_id, content, platform, time_str = post
-                print(f"🆔 ID: {post_id} | 🕒 {time_str} | 📱 {platform.upper()}")
-                print(f"📝 CONTENT:")
-                print(f"{content}")
-                print("-" * 90)
-            print(f"Total pending: {len(posts)}\n")
+            if approval:
+                print("\n📝 WAITING FOR APPROVAL")
+                print("=" * 90)
+                for post in approval:
+                    post_id, content, platform, time_str = post
+                    print(f"🆔 ID: {post_id} | 🕒 {time_str} | 📱 {platform.upper()}")
+                    print(f"📝 CONTENT:")
+                    print(f"{content}")
+                    print("-" * 90)
+            
+            if pending:
+                print("\n📅 SCHEDULED POSTS QUEUE (APPROVED)")
+                print("=" * 90)
+                for post in pending:
+                    post_id, content, platform, time_str = post
+                    print(f"🆔 ID: {post_id} | 🕒 {time_str} | 📱 {platform.upper()}")
+                    print(f"📝 CONTENT:")
+                    print(f"{content}")
+                    print("-" * 90)
+            
+            print(f"Total: {len(approval)} waiting approval, {len(pending)} approved pending.\n")
+
+    elif args.command == "approve":
+        mark_post_status(args.id, 'pending')
+        print(f"✅ Post {args.id} approved and moved to active queue.")
 
     elif args.command == "delete":
         import sqlite3
