@@ -5,3 +5,4 @@ google-genai
 tweepy
 ollama
 playwright
+beautifulsoup4
