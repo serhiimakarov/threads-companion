@@ -35,18 +35,24 @@ class BrowserEngine:
         result = subprocess.run(cmd, capture_output=True, text=True)
         html = result.stdout
         
-        # Aggressive extraction of Numeric Media ID
-        # 1. Direct post_id or media_id keys
+        # SUPER PERMISSIVE EXTRACTION
+        # Threads/IG Media IDs are usually 17-19 digits long and start with 3... or 1...
         m_id = None
-        m_id_match = re.search(r'\"post_id\":\"(\d{15,25})\"', html)
-        if not m_id_match: m_id_match = re.search(r'\"media_id\":\"(\d{15,25})\"', html)
-        if not m_id_match: m_id_match = re.search(r'\"id\":\"(\d{15,25})\"', html)
         
-        # 2. Extract from "target_id" or other JSON blobs if above failed
-        if not m_id_match: m_id_match = re.search(r'\"target_id\":\"(\d{15,25})\"', html)
+        # Priority 1: Explicit JSON keys
+        match = re.search(r'\"(?:post_id|media_id|target_id|id)\":\"?(\d{17,20})\"?', html)
+        if match:
+            m_id = match.group(1)
         
-        if m_id_match:
-            m_id = m_id_match.group(1)
+        # Priority 2: Barcelona Legacy pattern we just saw
+        if not m_id:
+            match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html)
+            if match: m_id = match.group(1)
+            
+        # Priority 3: First long number on page (risky but effective)
+        if not m_id:
+            match = re.search(r'(\d{17,20})', html)
+            if match: m_id = match.group(1)
         
         # Extract LSD
         lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', html)
@@ -65,7 +71,7 @@ class BrowserEngine:
                 m_id, lsd = self._get_lsd_token(url)
                 
                 if m_id:
-                    print(f"❤️ Liking Media ID: {m_id} (LSD: {lsd[:5]}...)")
+                    print(f"❤️ Liking Media ID: {m_id}...")
                     cmd = [
                         "curl", "-s", "-X", "POST",
                         "https://www.threads.net/api/v1/web/threads/like/",
@@ -82,12 +88,12 @@ class BrowserEngine:
                     
                     result = subprocess.run(cmd, capture_output=True, text=True)
                     if '"status":"ok"' in result.stdout:
-                        print(f"✅ SUCCESS: Like confirmed!")
+                        print(f"✅ SUCCESS: Like recorded!")
                         liked_urls.append(url)
                     else:
-                        print(f"⚠️ API Error: {result.stdout[:100]}")
+                        print(f"⚠️ API Rejection: {result.stdout[:100]}")
                 else:
-                    print("⚠️ Could not find Numeric Media ID on page.")
+                    print("⚠️ Media ID not found.")
                 
                 time.sleep(5)
             except Exception as e:
@@ -96,5 +102,4 @@ class BrowserEngine:
         return liked_urls
 
     def post_comment_web(self, post_url, comment_text):
-        # We can implement this similarly with /api/v1/web/threads/reply/
         return False
