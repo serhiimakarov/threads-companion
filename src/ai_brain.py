@@ -13,12 +13,9 @@ class AIBrain:
         if self.provider == 'gemini' and GEMINI_API_KEY:
             try:
                 self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-                # DYNAMIC MODEL DISCOVERY
                 models = self.gemini_client.models.list()
-                # Find the best available flash model
                 flash_models = [m.name for m in models if 'flash' in m.name.lower()]
                 if flash_models:
-                    # Prefer 1.5-flash-latest or 2.0-flash
                     self.gemini_model_id = flash_models[0].split('/')[-1]
                     print(f"✨ Dynamic AI Selection: Using {self.gemini_model_id}")
                 else:
@@ -34,7 +31,7 @@ class AIBrain:
                 self.ollama_client = ollama.Client(host=OLLAMA_HOST)
                 print(f"🤖 Local Brain Ready (Ollama: {OLLAMA_MODEL})")
             except:
-                print("❌ Ollama not reachable.")
+                print("⚠️ Ollama not reachable.")
 
     def is_active(self): return True
 
@@ -62,6 +59,30 @@ class AIBrain:
             return self._generate(prompt)
         except:
             return "A technical DIY enthusiast and software engineer focusing on automation."
+
+    def generate_quote_comment(self, persona, post_text):
+        prompt = f"""
+        Persona: {persona}
+        Someone else's post: "{post_text}"
+        TASK: Write a short (max 250 chars) comment to add to this post when quoting it.
+        Be smart, additive, or slightly provocative. Plain English. End with a question if it fits.
+        """
+        try:
+            return self._generate(prompt).replace('"', '')
+        except:
+            return "This is a great point. What's your take on this?"
+
+    def generate_external_comment(self, persona, post_text):
+        prompt = f"""
+        Persona: {persona}
+        Strangers post: "{post_text}"
+        Write a short (max 200 chars), smart, witty comment to attract attention.
+        CRITICAL: Plain English. NO PLACEHOLDERS.
+        """
+        try:
+            return self._generate(prompt).replace('"', '')
+        except:
+            return "Great post! Always interesting to see these kind of insights."
 
     def generate_post(self, persona, context=None, examples=None):
         prompt = f"""
