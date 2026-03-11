@@ -33,7 +33,6 @@ class AIBrain:
                 return res.text.strip()
             except Exception as e:
                 print(f"⚠️ Gemini error ({e}). Falling back to Ollama for this request...")
-                # Temporary switch provider for this call
                 format_type = 'json' if expect_json else None
                 res = ollama.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
                 return res['response'].strip()
@@ -69,7 +68,7 @@ class AIBrain:
             return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Tech opinion"}]}
 
     def evaluate_interaction(self, persona, post_text, reply_text):
-        prompt = f"Persona: {persona}. Post: {post_text}. Reply to: {reply_text}. Return JSON: {{"like": true, "reply": "text"}}"
+        prompt = f"Persona: {persona}. Post: {post_text}. Reply to: {reply_text}. Return JSON: {{\"like\": true, \"reply\": \"text\"}}"
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
