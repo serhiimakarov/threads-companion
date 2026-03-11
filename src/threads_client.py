@@ -99,10 +99,14 @@ class ThreadsClient:
             'access_token': self.access_token
         }
         response = requests.post(url, data=data)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"DEBUG: Quote creation failed. Status: {response.status_code}")
+            print(f"DEBUG: Response body: {response.text}")
+            raise e
+            
         container_id = response.json()['id']
-        
-        # Wait for container and publish
         time.sleep(3)
         return self.publish_container(container_id)
 
