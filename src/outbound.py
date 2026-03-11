@@ -43,12 +43,15 @@ def run_outbound_engagement():
                 comment = brain.generate_external_comment(persona, post_text)
                 
                 if comment:
-                    # In this lightweight mode, we simulate commenting for now 
-                    # OR we can use the BrowserEngine if we find a way to POST replies via HTTP.
-                    # For now, liking is our main weapon, commenting is pending.
-                    print(f"✅ Potential comment for {url}: {comment[:50]}...")
-                    comment_count += 1
-            except: pass
+                    print(f"💬 Attempting to post REAL comment on {url}...")
+                    success = browser.post_comment_web(url, comment)
+                    if success:
+                        print(f"✅ Comment posted: {comment[:50]}...")
+                        comment_count += 1
+                    else:
+                        print(f"❌ Failed to post comment on {url}")
+            except Exception as e:
+                print(f"⚠️ Error processing post {url}: {e}")
     
     if comment_count > 0 or post_urls:
         send_telegram_notification(f"🌍 *Smart Outbound:* Found and engaged with {len(post_urls[:5])} posts about #{selected_tag}.")
