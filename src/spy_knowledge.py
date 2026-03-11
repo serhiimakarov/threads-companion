@@ -1,36 +1,72 @@
-# Knowledge base for influential figures to inspire the AI agent.
+import requests
+import re
+import time
+import random
 
-HORMOZI_PRINCIPLES = """
-Alex Hormozi (The Executioner):
-- Tone: Direct, punchy, zero fluff.
-- Philosophy: "Volume negates luck". Focus on business efficiency and brutal consistency.
-- Structure: Hard truth -> Math of the problem -> Direct challenge to the reader.
-"""
+class SpyKnowledge:
+    """
+    Module for finding interesting content on Threads without a heavy browser.
+    """
+    def __init__(self, threads_client):
+        self.client = threads_client
 
-LEVELS_PRINCIPLES = """
-Pieter Levels (The Transparent Builder):
-- Tone: Raw, casual, extremely transparent.
-- Philosophy: "Build in Public". Share revenues, share failures, share the exact tech stack.
-- Structure: Data screenshot (described) -> Why I did it -> Radical honesty about the result.
-"""
+    def find_posts_by_tag(self, tag):
+        """
+        Tries to find posts using different strategies.
+        """
+        print(f"🕵️ SpyKnowledge: Searching for content related to #{tag}...")
+        
+        # Strategy 1: Official API (requires threads_keyword_search)
+        try:
+            results = self.client.search_posts(tag, limit=5)
+            if results and 'data' in results:
+                print("✅ Found posts via official API search.")
+                return [f"https://www.threads.net/@{p['username']}/post/{p['id']}" for p in results['data']]
+        except:
+            print("⚠️ Official API search failed or restricted.")
 
-MARC_LOU_PRINCIPLES = """
-Marc Lou (The Speed Demon):
-- Tone: High energy, humorous, relatable founder struggles.
-- Philosophy: "Ship Fast". Perfection is the enemy. Better a buggy launch today than a perfect one next year.
-- Structure: Relatable struggle -> Funny observation -> "Just shipped it anyway" vibe.
-"""
+        # Strategy 2: Google Search Scraper (Lightweight)
+        # Search for: site:threads.net "#python"
+        try:
+            search_query = f"site:threads.net \"#{tag}\""
+            url = f"https://www.google.com/search?q={search_query}"
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+            res = requests.get(url, headers=headers, timeout=15)
+            
+            # Find threads.net post links in Google results
+            links = re.findall(r'https://www.threads.net/@[a-zA-Z0-9._]+/post/[a-zA-Z0-9_-]+', res.text)
+            if links:
+                print(f"✅ Found {len(set(links))} posts via Google Proxy.")
+                return list(set(links))
+        except Exception as e:
+            print(f"⚠️ Google Proxy search failed: {e}")
 
-DAN_KOE_PRINCIPLES = """
-Dan Koe (The Modern Philosopher):
-- Tone: Minimalist, profound, structured.
-- Philosophy: "Your life is the product". Personal growth equals business growth.
-- Structure: Abstract concept -> How it applies to your work -> Mindset shift.
-"""
+        # Strategy 3: Niche Leaders (Safe fallback)
+        # Instead of searching, we just visit known profiles in the niche
+        niche_profiles = {
+            "python": ["@python.learning", "@realpython"],
+            "diy": ["@hackaday", "@raspberrypi"],
+            "indiehacker": ["@levelsio", "@pieterlevels"]
+        }
+        
+        target_profiles = niche_profiles.get(tag, ["@raspberrypi"])
+        print(f"💡 Strategy 3: Falling back to niche leaders: {target_profiles}")
+        
+        fallback_links = []
+        for profile in target_profiles:
+            fallback_links.append(f"https://www.threads.net/{profile}")
+            
+        return fallback_links
 
-SPY_TARGETS = {
-    "hormozi": HORMOZI_PRINCIPLES,
-    "levels": LEVELS_PRINCIPLES,
-    "marclou": MARC_LOU_PRINCIPLES,
-    "dankoe": DAN_KOE_PRINCIPLES
-}
+    def get_post_text_lightweight(self, url):
+        """
+        Extracts at least some context from a post URL without a browser.
+        """
+        try:
+            res = requests.get(url, timeout=10)
+            # Try to get meta description or title which usually contains post text
+            match = re.search(r'<meta property=\"og:description\" content=\"(.*?)\"', res.text)
+            if match:
+                return match.group(1)
+        except: pass
+        return "A technical post on Threads."
