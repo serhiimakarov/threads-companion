@@ -3,6 +3,7 @@ import json
 import requests
 import time
 import re
+import random
 
 class BrowserEngine:
     def __init__(self, state_path=None):
@@ -20,94 +21,91 @@ class BrowserEngine:
         try:
             with open(self.state_path, 'r') as f:
                 state = json.load(f)
-            # Important: Threads uses specific cookie names for session persistence
             return {c['name']: c['value'] for c in state.get('cookies', [])}
         except:
             return {}
 
     def _get_headers(self, cookies, lsd_token=''):
-        # We must mimic a REAL browser as closely as possible
+        # Precise mimicry of Threads Web 2025
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9",
             "X-IG-App-ID": "238280524082381",
-            "X-ASBD-ID": "129477",
             "X-FB-LSD": lsd_token if lsd_token else cookies.get('lsd', ''),
-            "X-IG-WWW-Claim": "0", # Critical for some web actions
+            "X-ASBD-ID": "129477",
+            "X-IG-WWW-Claim": "0",
+            "X-Requested-With": "XMLHttpRequest",
             "Origin": "https://www.threads.net",
             "Referer": "https://www.threads.net/",
+            "Content-Type": "application/x-www-form-urlencoded",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
-            "Content-Type": "application/x-www-form-urlencoded"
         }
-        
-        # Add CSRF token if present in cookies
         csrf = cookies.get('csrftoken')
-        if csrf:
-            headers["X-CSRFToken"] = csrf
-            
+        if csrf: headers["X-CSRFToken"] = csrf
         return headers
 
     def _extract_media_id(self, url, html_content):
-        # Extract from /t/ID format
+        # Format /t/ID
         if "/t/" in url:
-            m_id = url.split("/t/")[1].split("/")[0].split("?")[0]
-            if m_id.isdigit(): return m_id
+            parts = url.split("/t/")[1].split("/")[0].split("?")[0]
+            if parts.isdigit(): return parts
         
-        # Look for numeric patterns in JSON blobs
+        # Format /post/ID
+        if "/post/" in url:
+            parts = url.split("/post/")[1].split("/")[0].split("?")[0]
+            if parts.isdigit(): return parts
+
+        # Regex fallback
         match = re.search(r'\"post_id\":\"(\d+)\"', html_content)
         if match: return match.group(1)
-        
-        match = re.search(r'\"media_id\":\"(\d+)\"', html_content)
-        if match: return match.group(1)
-        
         return None
 
     def like_posts_batch(self, post_urls):
         if not self.is_authenticated() or not post_urls: return []
         
-        # We use a session object to maintain cookies properly
         session = requests.Session()
         cookies = self._get_cookies_dict()
-        for name, value in cookies.items():
-            session.cookies.set(name, value, domain=".threads.net")
+        for n, v in cookies.items():
+            session.cookies.set(n, v, domain=".threads.net")
 
         liked_urls = []
         for url in post_urls:
             try:
-                # 1. Fetch post page to get latest LSD and verify session
+                print(f"👉 Visiting: {url}")
                 res = session.get(url, headers=self._get_headers(cookies), timeout=15)
                 
                 m_id = self._extract_media_id(url, res.text)
+                # Extract fresh LSD from page
                 lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', res.text)
                 lsd_t = lsd_match.group(1) if lsd_match else cookies.get('lsd', '')
                 
                 if m_id:
-                    print(f"👉 Real liking Media ID {m_id}...")
+                    print(f"❤️ Liking Media ID {m_id}...")
                     like_url = "https://www.threads.net/api/v1/web/threads/like/"
                     
+                    # Essential payload for Web Like
                     payload = {
                         "media_id": m_id,
                         "lsd": lsd_t
                     }
                     
                     headers = self._get_headers(cookies, lsd_t)
-                    # For web POST, some additional headers might be needed
                     resp = session.post(like_url, data=payload, headers=headers, timeout=15)
                     
                     if resp.status_code == 200 and '"status":"ok"' in resp.text:
-                        print(f"✅ REAL LIKE RECORDED for {url}")
+                        print(f"✅ SUCCESS: {url}")
                         liked_urls.append(url)
                     else:
-                        print(f"⚠️ Like failed. Status: {resp.status_code}. Response: {resp.text[:50]}")
+                        print(f"⚠️ Failed. Code: {resp.status_code}. Msg: {resp.text[:100]}")
                 
-                time.sleep(random.randint(3, 7))
+                time.sleep(random.randint(5, 10))
             except Exception as e:
-                print(f"❌ Like loop error: {e}")
+                print(f"❌ Error: {e}")
         return liked_urls
 
     def post_comment_web(self, post_url, comment_text):
-        # Similar logic using session.post
+        # Commenting is similar but with "comment_text" in payload
         return False
