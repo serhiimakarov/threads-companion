@@ -8,20 +8,33 @@ class AIBrain:
     def __init__(self):
         self.provider = AI_PROVIDER
         self.gemini_client = None
-        self.gemini_model_id = 'gemini-2.0-flash'
+        self.gemini_model_id = None
         
         if self.provider == 'gemini' and GEMINI_API_KEY:
             try:
                 self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-            except:
-                print("⚠️ Failed to init Gemini. Switching to Ollama.")
+                # DYNAMIC MODEL DISCOVERY
+                models = self.gemini_client.models.list()
+                # Find the best available flash model
+                flash_models = [m.name for m in models if 'flash' in m.name.lower()]
+                if flash_models:
+                    # Prefer 1.5-flash-latest or 2.0-flash
+                    self.gemini_model_id = flash_models[0].split('/')[-1]
+                    print(f"✨ Dynamic AI Selection: Using {self.gemini_model_id}")
+                else:
+                    self.gemini_model_id = 'gemini-1.5-flash'
+            except Exception as e:
+                print(f"⚠️ Failed to dynamic init Gemini: {e}. Switching to Ollama.")
                 self.provider = 'ollama'
         else:
             self.provider = 'ollama'
 
         if self.provider == 'ollama':
-            self.ollama_client = ollama.Client(host=OLLAMA_HOST)
-            print(f"🤖 Local Brain Ready (Ollama: {OLLAMA_MODEL})")
+            try:
+                self.ollama_client = ollama.Client(host=OLLAMA_HOST)
+                print(f"🤖 Local Brain Ready (Ollama: {OLLAMA_MODEL})")
+            except:
+                print("❌ Ollama not reachable.")
 
     def is_active(self): return True
 
@@ -29,13 +42,15 @@ class AIBrain:
         if self.provider == 'gemini':
             try:
                 config = {'response_mime_type': 'application/json'} if expect_json else None
-                res = self.gemini_client.models.generate_content(model=self.gemini_model_id, contents=prompt, config=config)
+                res = self.gemini_client.models.generate_content(
+                    model=self.gemini_model_id, 
+                    contents=prompt, 
+                    config=config
+                )
                 return res.text.strip()
             except Exception as e:
-                print(f"⚠️ Gemini error ({e}). Falling back to Ollama for this request...")
-                format_type = 'json' if expect_json else None
-                res = ollama.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
-                return res['response'].strip()
+                print(f"⚠️ Gemini generate error: {e}")
+                raise e
         else:
             format_type = 'json' if expect_json else None
             res = self.ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
@@ -43,7 +58,10 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"Describe the 'Social Avatar' based on these posts: {posts_text}. Recent success: {top_posts}. 2-3 sentences."
-        return self._generate(prompt)
+        try:
+            return self._generate(prompt)
+        except:
+            return "A technical DIY enthusiast and software engineer focusing on automation."
 
     def generate_post(self, persona, context=None, examples=None):
         prompt = f"""
@@ -53,7 +71,10 @@ class AIBrain:
         TASK: Create a Threads post that drives replies. 
         No hashtags. End with a question. Plain English. Max 400 chars.
         """
-        return self._generate(prompt).replace('"', '')
+        try:
+            return self._generate(prompt).replace('"', '')
+        except:
+            return None
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
@@ -63,9 +84,10 @@ class AIBrain:
         Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "viral topic"}}]}}
         """
         try:
-            return json.loads(self._generate(prompt, expect_json=True))
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Tech opinion"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "General Tech update"}]}
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         prompt = f"Persona: {persona}. Post: {post_text}. Reply to: {reply_text}. Return JSON: {{\"like\": true, \"reply\": \"text\"}}"
