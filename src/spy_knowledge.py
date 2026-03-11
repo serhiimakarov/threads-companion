@@ -8,33 +8,46 @@ class SpyKnowledge:
         self.client = threads_client
 
     def find_posts_by_tag(self, tag):
-        print(f"🕵️ SpyKnowledge: Scraping Threads for #{tag}...")
+        """
+        Final reliable strategy: Target specific leaders in the niche.
+        """
+        niche_targets = {
+            "python": ["python.learning", "realpython", "python_tips", "talkpython"],
+            "diy": ["raspberrypi", "hackaday", "arduino.cc", "makezine"],
+            "indiehacker": ["levelsio", "pieterlevels", "indiehackers", "robwalling"],
+            "cybersecurity": ["mikko_hypponen", "schneierblog", "troyhunt"]
+        }
+        
+        usernames = niche_targets.get(tag, ["raspberrypi", "python.learning"])
+        target_username = random.choice(usernames)
+        
+        print(f"🎯 SpyKnowledge: Targeting niche leader @{target_username} for #{tag}...")
         
         try:
-            # The most reliable way: go to the tag search page and find shortcodes in JSON
-            url = f"https://www.threads.net/search?q=%23{tag}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.threads.net/"
-            }
-            
+            url = f"https://www.threads.net/@{target_username}"
+            headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
             res = requests.get(url, headers=headers, timeout=20)
             
-            # Extract shortcodes from the large JSON blobs inside HTML
-            # Pattern: "code":"DVk2Mc3CMgQ"
-            shortcodes = re.findall(r'\"code\":\"([a-zA-Z0-9_-]{11})\"', res.text)
+            # Extract post links from the profile page
+            # Links in profile look like: /@username/post/CODE
+            pattern = rf'\/@{target_username.replace(".", "\.")}\/post\/([a-zA-Z0-9_-]{11})'
+            shortcodes = re.findall(pattern, res.text)
             
             if shortcodes:
-                # Filter out unique and format as full URLs
                 links = [f"https://www.threads.net/t/{s}" for s in set(shortcodes)]
-                print(f"✅ FOUND {len(links)} posts via Direct Scraping.")
+                print(f"✅ FOUND {len(links)} posts from @{target_username}.")
                 return links
             else:
-                print("⚠️ No shortcodes found in HTML blob.")
+                # Emergency fallback: find ANY post link on the page
+                any_posts = re.findall(r'\/@[a-zA-Z0-9._]+\/post\/([a-zA-Z0-9_-]{11})', res.text)
+                if any_posts:
+                    links = [f"https://www.threads.net/t/{s}" for s in set(any_posts)]
+                    print(f"✅ FOUND {len(links)} general posts from the page.")
+                    return links
+                
+                print(f"⚠️ No posts found in profile of @{target_username}.")
         except Exception as e:
-            print(f"❌ Scraping failed: {e}")
+            print(f"❌ Target extraction failed: {e}")
 
         return []
 
@@ -42,7 +55,6 @@ class SpyKnowledge:
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
             res = requests.get(url, headers=headers, timeout=10)
-            # Threads puts content in og:description
             match = re.search(r'<meta property=\"og:description\" content=\"(.*?)\"', res.text)
             if match: return match.group(1)
         except: pass
