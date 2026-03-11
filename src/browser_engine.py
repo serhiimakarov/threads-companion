@@ -26,7 +26,7 @@ class BrowserEngine:
             return ""
 
     def _get_lsd_token(self, url):
-        """Uses curl to get the page and extract the LSD token."""
+        """Uses curl to get the page and extract the numeric Media ID and LSD token."""
         cookie_str = self._get_cookies_str()
         cmd = [
             "curl", "-s", "-L",
@@ -37,13 +37,14 @@ class BrowserEngine:
         result = subprocess.run(cmd, capture_output=True, text=True)
         html = result.stdout
         
-        m_id_match = re.search(r'"post_id":"(\d+)"', html)
-        lsd_match = re.search(r'"LSD",\[\],{"token":"(.*?)"}', html)
+        # Look for numeric media ID: "media_id":"337..." or "post_id":"337..."
+        m_id_match = re.search(r'\"media_id\":\"(\d+)\"', html)
+        if not m_id_match:
+            m_id_match = re.search(r'\"post_id\":\"(\d+)\"', html)
+        
+        lsd_match = re.search(r'\"LSD\",\[\],{\"token\":\"(.*?)\"}', html)
         
         m_id = m_id_match.group(1) if m_id_match else None
-        if not m_id and "/t/" in url:
-            m_id = url.split("/t/")[1].split("/")[0].split("?")[0]
-            
         return m_id, lsd_match.group(1) if lsd_match else ""
 
     def like_posts_batch(self, post_urls):
