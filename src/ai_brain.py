@@ -24,6 +24,18 @@ class AIBrain:
             format_type = 'json' if expect_json else None
             return self.ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)['response'].strip()
 
+    def generate_persona(self, posts_text, top_posts=None):
+        prompt = f"""
+        Based on these recent Threads posts and top-performing posts, describe their "Social Avatar".
+        Recent Posts: {posts_text}
+        Top Performing Posts: {top_posts if top_posts else "None available."}
+        Provide a concise 2-3 sentence description of the vibe and topics.
+        """
+        try:
+            return self._generate(prompt)
+        except:
+            return "A technical DIY enthusiast and software engineer focusing on automation and viral engagement."
+
     def generate_post(self, persona, context=None, examples=None):
         prompt = f"""
         You are: {persona}
@@ -34,9 +46,12 @@ class AIBrain:
         RULES:
         1. NO hashtags, NO placeholders.
         2. Must end with a compelling QUESTION to start a discussion.
-        3. Mention a niche authority if relevant (e.g. @raspberrypi, @python.learning).
+        3. Mention a niche authority if relevant (e.g. @raspberrypi).
         4. Use human-like casual tech slang.
-        5. Max 400 chars.
+        5. Max 400 characters.
+        6. NO pro-russian content.
+        
+        Post content:
         """
         try:
             content = self._generate(prompt).replace('"', '')
@@ -51,19 +66,18 @@ class AIBrain:
         Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "viral topic"}}]}}
         """
         try:
-            return json.loads(self._generate(prompt, expect_json=True))
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
         except:
             return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Controversial tech opinion"}]}
 
     def evaluate_interaction(self, persona, post_text, reply_text):
-        # AI now ALWAYS wants to reply to boost engagement
         prompt = f"""
         You are: {persona}
         Reply to this comment: "{reply_text}" on your post: "{post_text}"
-        Be friendly, smart, and keep the conversation going.
         Return JSON ONLY: {{"like": true, "reply": "your reply text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point! What do you think about the future of this technology?"}
+            return {"like": True, "reply": "Great point! What's your take on this?"}

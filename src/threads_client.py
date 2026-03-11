@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 
 class ThreadsClient:
-    BASE_URL = "https://graph.threads.net/v1.0"
+    BASE_URL = "https://graph.threads.com/v1.0"
     
     def __init__(self, app_id, app_secret, redirect_uri, access_token=None):
         self.app_id = app_id
@@ -20,10 +20,10 @@ class ThreadsClient:
             'scope': ','.join(scopes),
             'response_type': 'code'
         }
-        return f"https://threads.net/oauth/authorize?{urllib.parse.urlencode(params)}"
+        return f"https://threads.com/oauth/authorize?{urllib.parse.urlencode(params)}"
 
     def exchange_code_for_token(self, code):
-        url = "https://graph.threads.net/oauth/access_token"
+        url = "https://graph.threads.com/oauth/access_token"
         data = {
             'client_id': self.app_id,
             'client_secret': self.app_secret,

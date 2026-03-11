@@ -71,7 +71,7 @@ class BrowserEngine:
                     # 2. POST like with HTTP/2 and ALL headers
                     post_cmd = [
                         "curl", "-s", "--http2", "-X", "POST",
-                        "https://www.threads.net/api/v1/web/threads/like/",
+                        "https://www.threads.com/api/v1/web/threads/like/",
                         "-b", cookie_jar, "-c", cookie_jar,
                         "-H", f"User-Agent: {user_agent}",
                         "-H", "X-IG-App-ID: 238280524082381",
@@ -80,7 +80,7 @@ class BrowserEngine:
                         "-H", f"X-FB-LSD: {lsd}",
                         "-H", f"X-CSRFToken: {csrf}",
                         "-H", "X-Requested-With: XMLHttpRequest",
-                        "-H", "Origin: https://www.threads.net",
+                        "-H", "Origin: https://www.threads.com",
                         "-H", f"Referer: {url}",
                         "-H", "Content-Type: application/x-www-form-urlencoded",
                         "--data-raw", f"media_id={m_id}&lsd={lsd}"
