@@ -101,6 +101,7 @@ class AIBrain:
         3. No hashtags, no placeholders.
         4. End with a compelling question.
         5. Structure: [HOOK] -> [VALUE/STORY] -> [CTA/QUESTION].
+        6. LIMIT: Maximum 500 characters. Be punchy.
         
         Return JSON ONLY: {{"text": "post content", "wants_image": bool, "image_theme": "visual prompt description"}}
         """
