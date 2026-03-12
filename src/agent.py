@@ -7,6 +7,8 @@ from datetime import timedelta
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH, IMGBB_API_KEY
 
 def upload_to_imgbb(image_url):
+    from PIL import Image
+    import io
     if not IMGBB_API_KEY:
         print("⚠️ IMGBB_API_KEY missing. Skipping image upload.")
         return None
@@ -19,8 +21,16 @@ def upload_to_imgbb(image_url):
             print(f"⚠️ Failed to download image (Status {img_res.status_code})")
             return None
             
-        img_data = img_res.content
-        # 2. Upload to ImgBB
+        # 2. CONVERT TO JPEG using Pillow (Ensures compatibility)
+        img = Image.open(io.BytesIO(img_res.content))
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=95)
+        img_data = output.getvalue()
+
+        # 3. Upload to ImgBB
         url = "https://api.imgbb.com/1/upload"
         payload = {
             "key": IMGBB_API_KEY,
