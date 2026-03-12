@@ -94,9 +94,14 @@ def run_agent(dry_run=False):
                 # 3. LOCAL FALLBACK (The Rescue)
                 if not image_url:
                     print("🔄 External APIs failed. Using LOCAL fallback image...")
-                    local_assets = [f"assets/default_images/{f}" for f in os.listdir("assets/default_images") if f.endswith(".jpg")]
-                    if local_assets:
-                        image_url = upload_to_imgbb(random.choice(local_assets), is_local=True)
+                    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    assets_dir = os.path.join(base_dir, "assets", "default_images")
+                    if os.path.exists(assets_dir):
+                        local_assets = [os.path.join(assets_dir, f) for f in os.listdir(assets_dir) if f.endswith(".jpg")]
+                        if local_assets:
+                            image_url = upload_to_imgbb(random.choice(local_assets), is_local=True)
+                    else:
+                        print(f"⚠️ Assets directory not found at {assets_dir}")
 
             target_time = datetime.datetime.strptime(slot['time'], "%H:%M").time()
             scheduled_dt = datetime.datetime.combine(datetime.datetime.now().date(), target_time)
