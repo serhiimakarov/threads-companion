@@ -107,8 +107,8 @@ def run_scheduler():
     # Weekly Review every Sunday at 9 PM
     schedule.every().sunday.at("21:00").do(job_weekly_review)
     
-    # Check for interactions every 30 minutes
-    schedule.every(30).minutes.do(job_process_interactions)
+    # Check for interactions every 5 minutes
+    schedule.every(5).minutes.do(job_process_interactions)
     
     # Outbound Growth 2 times per day
     schedule.every().day.at("11:00").do(job_outbound_growth)
