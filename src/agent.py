@@ -12,10 +12,11 @@ def upload_to_imgbb(image_url):
         return None
     
     try:
-        # 1. Download from source (e.g. Pollinations)
-        img_res = requests.get(image_url)
+        # 1. Download from source
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        img_res = requests.get(image_url, headers=headers)
         if img_res.status_code != 200:
-            print(f"⚠️ Failed to download image from source: {img_res.status_code}")
+            print(f"⚠️ Failed to download image (Status {img_res.status_code})")
             return None
             
         img_data = img_res.content
@@ -26,9 +27,15 @@ def upload_to_imgbb(image_url):
             "image": base64.b64encode(img_data).decode('utf-8'),
         }
         res = requests.post(url, data=payload)
-        return res.json()['data']['url']
+        json_res = res.json()
+        
+        if res.status_code == 200 and 'data' in json_res:
+            return json_res['data']['url']
+        else:
+            print(f"❌ ImgBB Upload Failed: {json_res.get('error', {}).get('message', 'Unknown Error')}")
+            return None
     except Exception as e:
-        print(f"❌ ImgBB Upload Error: {e}")
+        print(f"❌ ImgBB Exception: {e}")
         return None
 
 def run_agent(dry_run=False):
