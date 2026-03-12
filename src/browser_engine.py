@@ -43,7 +43,7 @@ class BrowserEngine:
         return ""
 
     def _extract_media_id(self, url, html_content):
-        # 1. From URL if it's a direct ID link (very reliable)
+        # 1. From URL if it's a direct ID link
         if "/t/" in url:
             m_id = url.split("/t/")[1].split("/")[0].split("?")[0]
             if m_id.isdigit(): return m_id
@@ -52,15 +52,17 @@ class BrowserEngine:
             m_id = url.split("/post/")[1].split("/")[0].split("?")[0]
             if m_id.isdigit(): return m_id
 
-        # 2. From HTML JSON blobs
-        match = re.search(r'\"post_id\":\"?(\d{17,20})\"?', html_content)
-        if not match: match = re.search(r'\"media_id\":\"?(\d{17,20})\"?', html_content)
-        if not match: match = re.search(r'\"id\":\"?(\d{17,20})\"?', html_content)
+        # 2. Aggressive search for any 17-19 digit number in JSON blobs or HTML
+        # Look for "id":"337..." or "post_id":"337..." or just any quoted number
+        matches = re.findall(r'\"(?:post_id|media_id|id|target_id)\":\"?(\d{17,20})\"?', html_content)
+        if matches: return matches[0]
         
-        # 3. From Barcelona legacy pattern
-        if not match: match = re.search(r'BarcelonaPostLegacyPathController.*?(\d{17,20})', html_content)
+        # 3. Fallback: look for the first long numeric sequence that looks like a Media ID
+        # (usually starts with 3 or 1 and is 18-19 digits)
+        standalone_matches = re.findall(r'(\d{18,19})', html_content)
+        if standalone_matches: return standalone_matches[0]
         
-        return match.group(1) if match else None
+        return None
 
     def like_posts_batch(self, post_urls):
         if not self.is_authenticated() or not post_urls: return []
