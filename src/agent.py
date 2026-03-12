@@ -87,12 +87,12 @@ def run_agent(dry_run=False):
                 primary_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={random.randint(1, 99999)}"
                 image_url = upload_to_imgbb(primary_url)
                 
-                # Try Level 2: Unsplash Fallback
+                # Try Level 2: Unsplash Fallback (Dynamic Search)
                 if not image_url:
-                    print("🔄 AI Generation failed. Switching to Unsplash Fallback...")
-                    keywords = ai_response.get('image_keywords', 'technology,server,ai')
-                    fallback_url = f"https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1024&q=80" 
-                    # Note: in real world we'd use Unsplash Search API or a reliable proxy
+                    print("🔄 AI Generation failed. Switching to Dynamic Unsplash Fallback...")
+                    keywords = ai_response.get('image_keywords', 'technology,software,ai')
+                    # Use Source Unsplash for keyword-based random images
+                    fallback_url = f"https://source.unsplash.com/featured/1024x1024?{urllib.parse.quote(keywords)}"
                     image_url = upload_to_imgbb(fallback_url)
 
             # --- SCHEDULING ---
