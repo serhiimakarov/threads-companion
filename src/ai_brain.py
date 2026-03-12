@@ -103,6 +103,23 @@ class AIBrain:
         """
         return self._generate(prompt)
 
+    def decide_strategy(self, persona, peak_hour, performance_report=None):
+        prompt = f"""
+        Act like a Content Strategist for Threads.
+        Persona: {persona}
+        Peak Activity Hour: {peak_hour}:00
+        Recent Performance Data: {performance_report}
+        
+        TASK: Decide the posting strategy for the next 24 hours.
+        CRITICAL: All topics must be in ENGLISH.
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "viral topic based on Influencer 2.0 structures"}}]}}
+        """
+        try:
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
+        except:
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "General Tech Insights"}]}
+
     def evaluate_interaction(self, persona, post_text, reply_text):
         prompt = f"""
         Persona: {persona}
