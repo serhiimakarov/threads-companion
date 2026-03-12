@@ -4,38 +4,40 @@ import sqlite3
 import base64
 import requests
 import io
+import os
 import urllib.parse
 from datetime import timedelta
 from PIL import Image
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH, IMGBB_API_KEY
 
-def upload_to_imgbb(image_url):
-    if not IMGBB_API_KEY:
-        print("⚠️ IMGBB_API_KEY missing.")
-        return None
+def upload_to_imgbb(image_source, is_local=False):
+    """
+    Uploads an image to ImgBB. 
+    image_source can be a URL or a local file path.
+    """
+    if not IMGBB_API_KEY: return None
     
     try:
-        print(f"DEBUG: Downloading image from: {image_url[:60]}...")
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
-        img_res = requests.get(image_url, headers=headers, timeout=30)
-        
-        if img_res.status_code != 200:
-            print(f"⚠️ Download failed (Status {img_res.status_code})")
-            return None
-            
-        img = Image.open(io.BytesIO(img_res.content))
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-        
+        if not is_local:
+            print(f"DEBUG: Downloading from URL: {image_source[:50]}...")
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            res = requests.get(image_source, headers=headers, timeout=30)
+            if res.status_code != 200: return None
+            img_data = res.content
+        else:
+            print(f"DEBUG: Reading local file: {image_source}")
+            with open(image_source, 'rb') as f:
+                img_data = f.read()
+
+        # Convert to JPEG for 100% compatibility
+        img = Image.open(io.BytesIO(img_data))
+        if img.mode != 'RGB': img = img.convert('RGB')
         output = io.BytesIO()
         img.save(output, format='JPEG', quality=95)
-        img_data = output.getvalue()
+        final_data = output.getvalue()
 
         url = "https://api.imgbb.com/1/upload"
-        payload = {
-            "key": IMGBB_API_KEY,
-            "image": base64.b64encode(img_data).decode('utf-8'),
-        }
+        payload = {"key": IMGBB_API_KEY, "image": base64.b64encode(final_data).decode('utf-8')}
         res = requests.post(url, data=payload)
         json_res = res.json()
         
@@ -52,23 +54,21 @@ def run_agent(dry_run=False):
     from src.database import add_scheduled_post, init_db
     from src.analytics import analyze_user_profile, get_weekly_summary
     from src.ai_brain import AIBrain
-    from src.notifications import send_telegram_notification
 
-    print(f"🧠 AI Agent is seizing control... {'(DRY RUN)' if dry_run else ''}")
+    print(f"🧠 AI Agent: Influencer 2.0 Mode...")
     init_db()
     
     brain = AIBrain()
-    source_token = THREADS_ACCESS_TOKEN_SOURCE if THREADS_ACCESS_TOKEN_SOURCE else THREADS_ACCESS_TOKEN_TARGET
+    source_token = THREADS_ACCESS_TOKEN_SOURCE or THREADS_ACCESS_TOKEN_TARGET
     source_client = ThreadsClient(THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, source_token)
     
     try:
         threads_data = source_client.get_user_threads(limit=10)
         posts_text = "\n---\n".join([p.get('text', '') for p in threads_data.get('data', []) if p.get('text')])
         persona = brain.generate_persona(posts_text)
-        performance_report = get_weekly_summary()
-        decisions = brain.decide_strategy(persona, 12, performance_report=performance_report)
+        decisions = brain.decide_strategy(persona, 12)
     except Exception as e:
-        print(f"❌ Initialization failed: {e}")
+        print(f"❌ Init failed: {e}")
         return
 
     for slot in decisions.get('slots', []):
@@ -77,25 +77,27 @@ def run_agent(dry_run=False):
             content = ai_response.get('text')
             if not content: continue
             
-            # --- INTELLIGENT IMAGE PIPELINE ---
             image_url = None
             if ai_response.get('wants_image'):
                 img_prompt = brain.generate_image_prompt(content)
-                encoded_prompt = urllib.parse.quote(img_prompt)
                 
-                # Try Level 1: Pollinations PRO
-                primary_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={random.randint(1, 99999)}"
-                image_url = upload_to_imgbb(primary_url)
+                # 1. Try Pollinations PRO
+                encoded = urllib.parse.quote(img_prompt)
+                image_url = upload_to_imgbb(f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&nologo=true")
                 
-                # Try Level 2: Unsplash Fallback (Dynamic Search)
+                # 2. Try Dynamic Unsplash
                 if not image_url:
-                    print("🔄 AI Generation failed. Switching to Dynamic Unsplash Fallback...")
-                    keywords = ai_response.get('image_keywords', 'technology,software,ai')
-                    # Use Source Unsplash for keyword-based random images
-                    fallback_url = f"https://source.unsplash.com/featured/1024x1024?{urllib.parse.quote(keywords)}"
-                    image_url = upload_to_imgbb(fallback_url)
+                    print("🔄 AI Gen failed. Trying Unsplash...")
+                    keywords = ai_response.get('image_keywords', 'tech')
+                    image_url = upload_to_imgbb(f"https://source.unsplash.com/featured/1024x1024?{urllib.parse.quote(keywords)}")
+                
+                # 3. LOCAL FALLBACK (The Rescue)
+                if not image_url:
+                    print("🔄 External APIs failed. Using LOCAL fallback image...")
+                    local_assets = [f"assets/default_images/{f}" for f in os.listdir("assets/default_images") if f.endswith(".jpg")]
+                    if local_assets:
+                        image_url = upload_to_imgbb(random.choice(local_assets), is_local=True)
 
-            # --- SCHEDULING ---
             target_time = datetime.datetime.strptime(slot['time'], "%H:%M").time()
             scheduled_dt = datetime.datetime.combine(datetime.datetime.now().date(), target_time)
             if scheduled_dt <= datetime.datetime.now(): scheduled_dt += timedelta(days=1)
@@ -107,9 +109,7 @@ def run_agent(dry_run=False):
                     conn.cursor().execute('UPDATE scheduled_posts SET image_url = ? WHERE id = ?', (image_url, post_id))
                     conn.commit()
                     conn.close()
-                print(f"✅ Scheduled: ID {post_id}")
-            else:
-                print(f"🧪 DRY RUN: {content[:50]}... Image: {image_url}")
+                print(f"✅ Scheduled: ID {post_id} at {scheduled_dt}")
             
         except Exception as e:
             print(f"❌ Slot failed: {e}")
