@@ -54,7 +54,10 @@ class AIBrain:
             return res['response'].strip()
 
     def generate_persona(self, posts_text, top_posts=None):
-        prompt = f"Describe the 'Social Avatar' based on these posts: {posts_text}. Recent success: {top_posts}. 2-3 sentences."
+        prompt = f"""
+        Describe the 'Social Avatar' based on these posts: {posts_text}. Recent success: {top_posts}.
+        CRITICAL: Describe the persona in ENGLISH only.
+        """
         try:
             return self._generate(prompt)
         except:
@@ -65,7 +68,10 @@ class AIBrain:
         Persona: {persona}
         Someone else's post: "{post_text}"
         TASK: Write a short (max 250 chars) comment to add to this post when quoting it.
-        Be smart, additive, or slightly provocative. Plain English. End with a question if it fits.
+        CRITICAL RULES:
+        1. Write in ENGLISH only.
+        2. Be smart, additive, or slightly provocative.
+        3. End with a question if it fits.
         """
         try:
             return self._generate(prompt).replace('"', '')
@@ -76,8 +82,10 @@ class AIBrain:
         prompt = f"""
         Persona: {persona}
         Strangers post: "{post_text}"
-        Write a short (max 200 chars), smart, witty comment to attract attention.
-        CRITICAL: Plain English. NO PLACEHOLDERS.
+        TASK: Write a short (max 200 chars), smart, witty comment to attract attention.
+        CRITICAL RULES:
+        1. Write in ENGLISH only.
+        2. NO PLACEHOLDERS.
         """
         try:
             return self._generate(prompt).replace('"', '')
@@ -89,7 +97,7 @@ class AIBrain:
         Post Text: "{post_text}"
         TASK: Generate a simple, artistic image prompt for an AI image generator (like DALL-E or Midjourney).
         The image should represent the theme of the post.
-        Return ONLY the prompt string, no meta-text. Max 100 characters.
+        Return ONLY the prompt string in ENGLISH, no meta-text. Max 100 characters.
         """
         try:
             return self._generate(prompt)
@@ -103,8 +111,10 @@ class AIBrain:
         Their Content: "{post_context}"
         
         TASK: Write a very short Threads post (max 200 chars) mentioning @{target_username}.
-        Be smart, ask for their opinion, or give a tech-compliment.
-        Goal: Start a conversation. Plain English. No hashtags.
+        CRITICAL RULES:
+        1. Write in ENGLISH only.
+        2. Be smart, ask for their opinion, or give a tech-compliment.
+        3. Goal: Start a conversation. No hashtags.
         """
         try:
             return self._generate(prompt).replace('"', '')
@@ -117,8 +127,10 @@ class AIBrain:
         Context: {context}
         Examples: {examples}
         TASK: Create a Threads post that drives replies. 
-        Return JSON ONLY: {{"text": "your post text", "wants_image": bool, "image_theme": "short theme"}}
-        No hashtags. End with a question. Plain English. Max 400 chars.
+        CRITICAL RULES:
+        1. Write in ENGLISH only.
+        2. Return JSON ONLY: {{"text": "your post text", "wants_image": bool, "image_theme": "short theme"}}
+        3. No hashtags. End with a question. Plain English. Max 400 chars.
         """
         try:
             raw = self._generate(prompt, expect_json=True)
@@ -131,6 +143,8 @@ class AIBrain:
         Persona: {persona}
         Peak: {peak_hour}:00
         Data: {performance_report}
+        TASK: Decide posting strategy.
+        CRITICAL: All topics and descriptions must be in ENGLISH.
         Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "viral topic"}}]}}
         """
         try:
@@ -140,8 +154,20 @@ class AIBrain:
             return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "General Tech update"}]}
 
     def evaluate_interaction(self, persona, post_text, reply_text):
-        prompt = f"Persona: {persona}. Post: {post_text}. Reply to: {reply_text}. Return JSON: {{\"like\": true, \"reply\": \"text\"}}"
+        prompt = f"""
+        You are: {persona}
+        Someone replied: "{reply_text}" to your post: "{post_text}"
+        
+        TASK: Decide if you should like and how to reply.
+        CRITICAL RULES:
+        1. ALWAYS answer in ENGLISH, even if the user speaks another language (like Russian or Ukrainian).
+        2. If the user speaks Russian, carefully but firmly switch the conversation to English.
+        3. NEVER use Russian language in your response.
+        4. Be friendly, smart, and stay in character.
+        
+        Return JSON ONLY: {{\"like\": true, \"reply\": \"your reply text in English\"}}
+        """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point!"}
+            return {"like": True, "reply": "Interesting point! I prefer to keep my technical discussions in English to reach a broader audience. What do you think?"}
