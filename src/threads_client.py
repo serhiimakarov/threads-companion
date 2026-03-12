@@ -13,7 +13,7 @@ class ThreadsClient:
         self.access_token = access_token
         self.user_id = None
 
-    def get_auth_url(self, scopes=['threads_basic', 'threads_content_publish', 'threads_manage_replies', 'threads_manage_insights', 'threads_delete']):
+    def get_auth_url(self, scopes=['threads_basic', 'threads_content_publish', 'threads_manage_replies', 'threads_manage_insights', 'threads_read_replies']):
         params = {
             'client_id': self.app_id,
             'redirect_uri': self.redirect_uri,
