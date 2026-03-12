@@ -97,11 +97,14 @@ def process_interactions():
                     reply_msg = decision['reply']
                     try:
                         container_id = target_client.create_reply_container(reply_id, reply_msg)
-                        time.sleep(2) 
-                        target_client.publish_container(container_id)
+                        print(f"⌛ Container {container_id} created. Waiting for Meta processing (15s)...")
+                        time.sleep(15) 
+                        published_id = target_client.publish_container(container_id)
+                        print(f"✅ SUCCESS: Replied to @{reply_user}. ID: {published_id}")
                         mark_interaction_processed(reply_id, f"replied: {reply_msg}")
-                        send_telegram_notification(f"💬 *Replied to @{reply_user}:* {reply_msg}")
-                    except: pass
+                        send_telegram_notification(f"💬 *Replied to @{reply_user}:*\n\n\"{reply_msg}\"")
+                    except Exception as re:
+                        print(f"❌ Failed to post reply to @{reply_user}: {re}")
     except Exception as e:
         print(f"Interaction error: {e}")
 
