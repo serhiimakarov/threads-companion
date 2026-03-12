@@ -3,6 +3,7 @@ from google import genai
 import ollama
 import os
 import random
+import requests
 from datetime import datetime
 from src.config import GEMINI_API_KEY, AI_PROVIDER, OLLAMA_MODEL, OLLAMA_HOST
 
@@ -13,7 +14,7 @@ class AIBrain:
         self.gemini_model_id = None
         self.log_file = "data/ai_prompts.log"
         
-        # VISUAL STYLE BLUEPRINT (Based on createbangers advice)
+        # VISUAL STYLE BLUEPRINT
         self.visual_style = {
             "style": "Minimalist futuristic technical art",
             "palette": "Deep slate, electric blue, neon orange accents",
@@ -68,18 +69,11 @@ class AIBrain:
         Act like a Personal Brand Consultant for Threads. 
         Analyze these posts: {posts_text}. 
         Successes: {top_posts}.
-        
-        TASK: Craft a razor-sharp POSITIONING statement for this Social Avatar.
-        Define: 
-        1. Unique Angle (e.g., The DIY Automation Strategist).
-        2. Target Audience (e.g., IndieHackers, IoT enthusiasts).
-        3. The core 'Pain' you destroy (e.g., complexity of tech automation).
-        Provide in 3 powerful sentences. ENGLISH ONLY.
+        TASK: Craft a razor-sharp POSITIONING statement. 3 sentences. English.
         """
         return self._generate(prompt)
 
     def generate_post(self, persona, context=None, examples=None):
-        # VIRAL STRUCTURES PICKER
         structures = [
             "Myth-busting: Identify a common tech lie and destroy it.",
             "Horror Story: A technical failure and the lesson learned.",
@@ -93,17 +87,8 @@ class AIBrain:
         Persona: {persona}
         Context: {context}
         Structure to follow: {selected_structure}
-        
-        TASK: Create a SCROLL-STOPPING Threads post.
-        RULES:
-        1. Write in ENGLISH ONLY.
-        2. Use a 'Hook' first line (Pattern Interrupt).
-        3. No hashtags, no placeholders.
-        4. End with a compelling question.
-        5. Structure: [HOOK] -> [VALUE/STORY] -> [CTA/QUESTION].
-        6. LIMIT: Maximum 500 characters. Be punchy.
-        
-        Return JSON ONLY: {{"text": "post content", "wants_image": bool, "image_theme": "visual prompt description"}}
+        TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
+        Return JSON: {{"text": "content", "wants_image": bool, "image_keywords": "3-4 technical keywords for fallback search", "image_theme": "visual prompt"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
@@ -114,25 +99,18 @@ class AIBrain:
         prompt = f"""
         Post: "{post_text}"
         Visual Style Guide: {json.dumps(self.visual_style)}
-        
-        TASK: Generate a high-quality, artistic image prompt for Pollinations.ai.
-        Include elements from our Visual Style Guide to maintain brand consistency.
-        Return ONLY the prompt string. Max 150 chars.
+        TASK: Generate a high-quality, artistic image prompt for AI generation. Max 150 chars.
         """
         return self._generate(prompt)
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         prompt = f"""
-        Act like an Engagement Specialist.
         Persona: {persona}
         Someone replied: "{reply_text}" to your post: "{post_text}"
-        
         TASK: Write a value-packed, smart reply in English. 
-        Aim to turn this into a conversation. 
-        If it's a hater, be firm but professional. If it's a fan, be helpful.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting take! Let's dive deeper into this."}
+            return {"like": True, "reply": "Interesting take! Let's dive deeper."}
