@@ -52,6 +52,10 @@ def main():
     auth_parser = subparsers.add_parser("auth", help="Authenticate with Threads")
     auth_parser.add_argument("--account", choices=['source', 'target'], default='target', help="Which account to authenticate (default: target/bot)")
 
+    # Refresh
+    refresh_parser = subparsers.add_parser("refresh", help="Refresh Threads access tokens")
+    refresh_parser.add_argument("--account", choices=['source', 'target'], default='target', help="Which account to refresh (default: target/bot)")
+
     args = parser.parse_args()
 
     init_db()
@@ -168,14 +172,41 @@ def main():
 
         if code:
             try:
+                # 1. Get short-lived token
                 token_data = client.exchange_code_for_token(code)
+                print("Step 1: Short-lived token obtained.")
+                
+                # 2. Automatically exchange for long-lived token
+                print("Step 2: Exchanging for long-lived (60-day) token...")
+                long_lived_data = client.get_long_lived_token()
+                
                 print("\nAuthentication successful!")
                 env_var = "THREADS_ACCESS_TOKEN_TARGET" if args.account == 'target' else "THREADS_ACCESS_TOKEN_SOURCE"
-                print(f"Update your .env with:\n{env_var}={token_data['access_token']}")
+                print(f"Update your .env with:\n{env_var}={long_lived_data['access_token']}")
             except Exception as e:
                 print(f"Authentication failed: {e}")
         else:
             print("Operation cancelled.")
+
+    elif args.command == "refresh":
+        # Force reload to get latest env
+        load_dotenv(override=True)
+        token_to_refresh = os.getenv('THREADS_ACCESS_TOKEN_TARGET') if args.account == 'target' else os.getenv('THREADS_ACCESS_TOKEN_SOURCE')
+        
+        if not token_to_refresh:
+            print(f"❌ Error: No token found for {args.account} in .env")
+            return
+
+        client = ThreadsClient(APP_ID, APP_SECRET, REDIRECT_URI, token_to_refresh)
+        try:
+            print(f"🔄 Refreshing {args.account} token...")
+            new_token_data = client.refresh_long_lived_token()
+            print("\nToken refreshed successfully!")
+            env_var = "THREADS_ACCESS_TOKEN_TARGET" if args.account == 'target' else "THREADS_ACCESS_TOKEN_SOURCE"
+            print(f"Update your .env with:\n{env_var}={new_token_data['access_token']}")
+            print(f"Expires in: {new_token_data.get('expires_in', 0) // 86400} days.")
+        except Exception as e:
+            print(f"❌ Refresh failed: {e}")
 
     else:
         parser.print_help()

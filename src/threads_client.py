@@ -37,6 +37,39 @@ class ThreadsClient:
         self.access_token = token_data['access_token']
         return token_data
 
+    def get_long_lived_token(self, short_lived_token=None):
+        """
+        Exchanges a short-lived token for a long-lived (60 days) token.
+        """
+        token = short_lived_token or self.access_token
+        url = "https://graph.threads.com/access_token"
+        params = {
+            'grant_type': 'th_exchange_token',
+            'client_secret': self.app_secret,
+            'access_token': token
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        token_data = response.json()
+        self.access_token = token_data['access_token']
+        return token_data
+
+    def refresh_long_lived_token(self, long_lived_token=None):
+        """
+        Refreshes a valid long-lived token.
+        """
+        token = long_lived_token or self.access_token
+        url = "https://graph.threads.com/refresh_access_token"
+        params = {
+            'grant_type': 'th_refresh_token',
+            'access_token': token
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        token_data = response.json()
+        self.access_token = token_data['access_token']
+        return token_data
+
     def get_user_profile(self):
         url = f"{self.BASE_URL}/me"
         params = {
