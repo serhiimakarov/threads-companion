@@ -88,12 +88,21 @@ class AIBrain:
         Context: {context}
         Structure to follow: {selected_structure}
         TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
-        Return JSON: {{"text": "content", "wants_image": bool, "image_keywords": "3-4 technical keywords for fallback search", "image_theme": "visual prompt"}}
+        RULES:
+        1. Write in ENGLISH ONLY.
+        2. Use a 'Hook' first line (Pattern Interrupt).
+        3. No hashtags, no placeholders.
+        4. End with a compelling question.
+        5. Structure: [HOOK] -> [VALUE/STORY] -> [CTA/QUESTION].
+        6. LIMIT: Maximum 500 characters.
+        
+        Return JSON ONLY: {{"text": "your post content"}}
         """
         try:
-            return json.loads(self._generate(prompt, expect_json=True))
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
         except:
-            return {"text": None, "wants_image": False, "image_theme": None}
+            return {"text": None}
 
     def generate_image_prompt(self, post_text):
         prompt = f"""
