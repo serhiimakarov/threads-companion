@@ -14,15 +14,24 @@ def upload_to_imgbb(image_url):
         return None
     
     try:
+        print(f"DEBUG: Downloading image from: {image_url[:100]}...")
         # 1. Download from source
         headers = {'User-Agent': 'Mozilla/5.0'}
-        img_res = requests.get(image_url, headers=headers)
+        img_res = requests.get(image_url, headers=headers, timeout=30)
         if img_res.status_code != 200:
             print(f"⚠️ Failed to download image (Status {img_res.status_code})")
             return None
+        
+        print(f"DEBUG: Image size downloaded: {len(img_res.content)} bytes. Content-type: {img_res.headers.get('Content-Type')}")
             
         # 2. CONVERT TO JPEG using Pillow (Ensures compatibility)
-        img = Image.open(io.BytesIO(img_res.content))
+        try:
+            img = Image.open(io.BytesIO(img_res.content))
+        except Exception as e:
+            print(f"❌ Pillow Error (Could not identify image): {e}")
+            # If it's not a valid image file, maybe it's an error page or redirect
+            return None
+
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
@@ -40,6 +49,7 @@ def upload_to_imgbb(image_url):
         json_res = res.json()
         
         if res.status_code == 200 and 'data' in json_res:
+            print(f"✅ Hosted on ImgBB: {json_res['data']['url']}")
             return json_res['data']['url']
         else:
             print(f"❌ ImgBB Upload Failed: {json_res.get('error', {}).get('message', 'Unknown Error')}")
