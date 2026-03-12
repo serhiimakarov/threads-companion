@@ -157,7 +157,12 @@ class ThreadsClient:
             'access_token': self.access_token
         }
         response = requests.post(url, data=data)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"DEBUG: Publish failed for container {container_id}. Status: {response.status_code}")
+            print(f"DEBUG: Response body: {response.text}")
+            raise e
         return response.json()['id']
 
     def get_user_threads(self, limit=20):
