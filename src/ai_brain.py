@@ -2,6 +2,7 @@ import json
 from google import genai
 import ollama
 import os
+from datetime import datetime
 from src.config import GEMINI_API_KEY, AI_PROVIDER, OLLAMA_MODEL, OLLAMA_HOST
 
 class AIBrain:
@@ -9,6 +10,10 @@ class AIBrain:
         self.provider = AI_PROVIDER
         self.gemini_client = None
         self.gemini_model_id = None
+        self.log_file = "data/ai_prompts.log"
+        
+        # Ensure data dir exists for logging
+        os.makedirs("data", exist_ok=True)
         
         if self.provider == 'gemini' and GEMINI_API_KEY:
             try:
@@ -35,23 +40,43 @@ class AIBrain:
 
     def is_active(self): return True
 
+    def _log_prompt(self, prompt, response):
+        """Logs the AI interaction to a file."""
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            with open(self.log_file, "a", encoding="utf-8") as f:
+                f.write(f"\n{'='*80}\n")
+                f.write(f"🕒 TIMESTAMP: {timestamp} | PROVIDER: {self.provider}\n")
+                f.write(f"📥 PROMPT:\n{prompt}\n")
+                f.write(f"📤 RESPONSE:\n{response}\n")
+                f.write(f"{'='*80}\n")
+        except Exception as e:
+            print(f"❌ Failed to log AI interaction: {e}")
+
     def _generate(self, prompt, expect_json=False):
-        if self.provider == 'gemini':
-            try:
+        response_text = ""
+        try:
+            if self.provider == 'gemini':
                 config = {'response_mime_type': 'application/json'} if expect_json else None
                 res = self.gemini_client.models.generate_content(
                     model=self.gemini_model_id, 
                     contents=prompt, 
                     config=config
                 )
-                return res.text.strip()
-            except Exception as e:
-                print(f"⚠️ Gemini generate error: {e}")
-                raise e
-        else:
-            format_type = 'json' if expect_json else None
-            res = self.ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
-            return res['response'].strip()
+                response_text = res.text.strip()
+            else:
+                format_type = 'json' if expect_json else None
+                res = self.ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
+                response_text = res['response'].strip()
+            
+            # Log the successful interaction
+            self._log_prompt(prompt, response_text)
+            return response_text
+            
+        except Exception as e:
+            print(f"⚠️ AI generate error: {e}")
+            self._log_prompt(prompt, f"ERROR: {str(e)}")
+            raise e
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
