@@ -60,17 +60,16 @@ class AIBrain:
             raise e
 
     def get_system_prompt(self):
-        # Always reload to get latest version
         self.persona = load_persona()
         dna = self.persona.get('linguistic_dna', {})
         reactions = dna.get('reactions', {})
         return f"""
-        YOU ARE: {self.persona.get('identity', 'A technical expert')}
-        PHILOSOPHY: {self.persona.get('philosophy', 'Pragmatism')}
+        YOU ARE: {self.persona.get('identity')}
+        PHILOSOPHY: {self.persona.get('philosophy')}
         PROJECTS: {', '.join(self.persona.get('projects', []))}
-        TONE: {dna.get('tone', 'Technical')}
-        REACTIONS: Use '{reactions.get('inefficiency', 'cringe')}' for bad tech, 
-        and '{reactions.get('inevitable failure', 'shit happens')}' for unavoidable issues.
+        TONE: {dna.get('tone')}
+        REACTIONS: Use '{reactions.get('inefficiency')}' for bad tech, 
+        and '{reactions.get('inevitable failure')}' for unavoidable issues.
         PRINCIPLES: {'; '.join(self.persona.get('principles', []))}
         """
 
@@ -116,26 +115,43 @@ class AIBrain:
         except:
             return {"text": None}
 
-    def edit_post(self, raw_post_text):
-        dna = self.persona.get('linguistic_dna', {})
-        reactions = dna.get('reactions', {})
-        prompt = f"""
-        ACT AS A SENIOR EDITOR. 
-        PERSONA: {self.persona.get('identity')}
-        PHILOSOPHY: {self.persona.get('philosophy')}
-        RULES:
-        1. Ensure the tone is dry and pragmatic.
-        2. Use '{reactions.get('inefficiency')}' or '{reactions.get('inevitable failure')}' ONLY if perfectly natural.
-        3. Remove any generic chatbot-style excitement.
-        4. Keep it under 500 chars.
-        
-        POST: "{raw_post_text}"
-        Return ONLY the rewritten text.
+    def analyze_post(self, draft_text):
         """
-        try:
-            return self._generate(prompt, role="EDITOR_CRITIQUE").replace('"', '')
-        except:
-            return raw_post_text
+        ROLE: EDITOR. Provides detailed critique.
+        """
+        prompt = f"""
+        ACT AS A SENIOR EDITOR & TECH-LEAD.
+        USER PERSONA: {self.persona.get('identity')}
+        PHILOSOPHY: {self.persona.get('philosophy')}
+        
+        CRITIQUE THIS DRAFT:
+        "{draft_text}"
+        
+        TASK: Provide a detailed analysis. Look for cliches, unnatural slang, or weak hooks.
+        Return your analysis as a list of specific improvements.
+        """
+        return self._generate(prompt, role="EDITOR_CRITIQUE")
+
+    def refine_post(self, draft_text, analysis):
+        """
+        ROLE: WRITER. Rewrites based on feedback.
+        """
+        system = self.get_system_prompt()
+        prompt = f"""
+        {system}
+        
+        ORIGINAL DRAFT: "{draft_text}"
+        EDITOR'S FEEDBACK: {analysis}
+        
+        TASK: Rewrite the post to be 100% authentic. Keep it under 500 chars.
+        Return ONLY the final text.
+        """
+        return self._generate(prompt, role="WRITER_FINAL").replace('"', '')
+
+    def edit_post(self, raw_post_text):
+        # Legacy method for compatibility or quick edits
+        analysis = self.analyze_post(raw_post_text)
+        return self.refine_post(raw_post_text, analysis)
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         system = self.get_system_prompt()
