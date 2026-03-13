@@ -71,32 +71,26 @@ class AIBrain:
         """
 
     def generate_persona(self, posts_text, top_posts=None):
-        # We now use the static constitution but can still 'tune' it with recent vibe
         return self.persona['identity']
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         system = self.get_system_prompt()
         prompt = f"""
         {system}
-        
-        TASK: Project 3-5 specific technical or solopreneur topics for the next 24h.
-        Be authentic to your PHP/JS and DIY background.
+        TASK: Project 3 specific technical topics for the next 24h.
+        Be creative, varied, and avoid repetition.
         Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific topic description"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The reality of independent product engineering"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Pragmatic engineering insights"}]}
 
     def generate_post(self, persona, context=None, examples=None):
         system = self.get_system_prompt()
         structures = [
-            "Technical Myth-busting: Destroy a common dev/hardware misconception.",
-            "Engineering Horror Story: A real fail and the lesson.",
-            "Contrarian Take: Why a popular tool or method is strategic debt.",
-            "Deep Technical Insight: A detail about code or hardware performance.",
-            "The Beauty of Efficiency: A rant about clean design or minimalism."
+            "Technical Myth-busting", "Engineering Horror Story", "Contrarian Take", "Deep Technical Insight", "The Beauty of Efficiency"
         ]
         selected_structure = random.choice(structures)
         
@@ -108,9 +102,9 @@ class AIBrain:
         TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
         1. Use a punchy HOOK.
         2. Speak like a senior PHP/JS engineer.
-        3. End with a question for builders.
+        3. Use LINGUISTIC MARKERS ONLY IF they feel 100% natural (don't force them).
         
-        Return JSON ONLY: {{"text": "post content"}}
+        Return JSON ONLY: {{"text": "raw post content"}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
@@ -118,16 +112,39 @@ class AIBrain:
         except:
             return {"text": None}
 
+    def edit_post(self, raw_post_text):
+        """
+        ACTS AS AN EDITOR. Refines the post to sound more human and less 'AI-trying-too-hard'.
+        """
+        prompt = f"""
+        ACT AS A SENIOR EDITOR for a high-end technical Threads account.
+        USER PERSONA: {self.persona['identity']}
+        RULES FOR EDITOR:
+        1. REMOVE 'крінжа' if it feels forced or used more than once in a paragraph.
+        2. REMOVE direct app links (e.g. flavorful.app) unless CRITICAL for the story.
+        3. MAKE IT HUMAN: Break the 'template' feel. Vary sentence length.
+        4. REMOVE generic AI questions at the end if they sound like a chatbot.
+        5. TONE: Pragmatic, slightly cynical, but helpful.
+        
+        ORIGINAL POST:
+        "{raw_post_text}"
+        
+        TASK: Rewrite the post to be BETTER. Keep it under 500 chars. Return ONLY the rewritten text.
+        """
+        try:
+            return self._generate(prompt).replace('"', '')
+        except:
+            return raw_post_text
+
     def evaluate_interaction(self, persona, post_text, reply_text):
         system = self.get_system_prompt()
         prompt = f"""
         {system}
         Reply: "{reply_text}" to: "{post_text}"
-        
-        TASK: Write a smart, short reply in English. Avoid generic 'AI' phrases.
+        TASK: Write a smart, short reply in English.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point. Let's look at the technical trade-offs."}
+            return {"like": True, "reply": "Interesting point."}

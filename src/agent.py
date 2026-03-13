@@ -77,6 +77,12 @@ def run_agent(dry_run=False):
             if scheduled_dt <= datetime.datetime.now(): scheduled_dt += timedelta(days=1)
 
             if not dry_run:
+                # --- EDITING STEP (New Editor Agent) ---
+                print(f"✍️ Editor is reviewing post ID {slot['topic']}...")
+                refined_content = brain.edit_post(content)
+                if refined_content:
+                    content = refined_content
+                
                 post_id = add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
                 print(f"✅ Scheduled for Approval: ID {post_id}")
                 
