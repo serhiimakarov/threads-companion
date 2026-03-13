@@ -3,7 +3,6 @@ from google import genai
 import ollama
 import os
 import random
-import requests
 from datetime import datetime
 from src.config import GEMINI_API_KEY, AI_PROVIDER, OLLAMA_MODEL, OLLAMA_HOST
 
@@ -66,87 +65,76 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
-        Act like a Personal Brand Consultant for Threads. 
-        Analyze these posts: 
-        ---
-        {posts_text}
-        --- 
-        Successes:
-        ---
-        {top_posts}
-        ---
-        TASK: Craft a razor-sharp POSITIONING statement. 3 sentences. English.
+        Act like a Personal Brand Consultant. 
+        Current Context: DIY Electronics, Raspberry Pi, Software Engineering, Python, Automation, Jeeps, and AI experiments.
+        
+        TASK: Craft a razor-sharp POSITIONING statement for this Social Avatar.
+        Focus on being a technical expert who builds real things.
+        3 sentences max. ENGLISH ONLY.
         """
         return self._generate(prompt)
 
     def generate_post(self, persona, context=None, examples=None):
+        # BROAD RANGE OF TOPICS to avoid repetition
+        topics = [
+            "Hardware hacking and Raspberry Pi secrets",
+            "Python automation tips for real-world problems",
+            "IoT and Smart Home architecture fails",
+            "The reality of building AI agents locally",
+            "Off-road tech and Jeep modifications",
+            "Software engineering best practices vs reality",
+            "Minimalist technical setup and tools"
+        ]
+        selected_topic = context if context else random.choice(topics)
+        
+        # VIRAL STRUCTURES
         structures = [
-            "Myth-busting: Identify a common tech lie and destroy it.",
-            "Horror Story: A technical failure and the lesson learned.",
-            "Contrarian Hot Take: An unpopular opinion about AI or Software.",
-            "Step-by-step Framework: How to optimize a specific workflow.",
-            "The Curiosity Gap: A 'Did you know' style opening that reveals a secret."
+            "Myth-busting: A common technical misconception.",
+            "Horror Story: A hardware/software failure.",
+            "Contrarian Take: Why a popular tool/method is actually bad.",
+            "Deep Insight: A subtle technical detail that changes everything.",
+            "Curiosity Gap: A mystery about a specific hardware/code."
         ]
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona: 
-        ---
-        {persona}
-        ---
-
-        Context:
-        ---
-        {context}
-        ---
-
-        Structure to follow:
-        ---
-        {selected_structure}
-        ---
-
-        TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
-        RULES:
-        1. Write in ENGLISH ONLY.
-        2. Use a 'Hook' first line (Pattern Interrupt).
-        3. No hashtags, no placeholders.
-        4. End with a compelling question.
-        5. Structure: [HOOK] -> [VALUE/STORY] -> [CTA/QUESTION].
-        6. LIMIT: Maximum 500 characters.
+        Persona: {persona}
+        Topic: {selected_topic}
+        Structure: {selected_structure}
         
-        Return JSON ONLY: {{"text": "your post content"}}
+        TASK: Create a Threads post. Max 500 chars.
+        CRITICAL RULES:
+        1. NO generic 'AI talking about AI' posts. Be a TECH EXPERT first.
+        2. Talk about real things: soldering, latency, backends, engines, sensors.
+        3. Use a strong HOOK.
+        4. NO hashtags, NO placeholders.
+        5. End with a specific question about the TOPIC.
+        6. NO mention of being an 'AI agent' unless the topic is specifically about building one.
+        
+        Return JSON ONLY: {{"text": "post content"}}
         """
         try:
-            raw = self._generate(prompt, expect_json=True)
-            return json.loads(raw)
+            return json.loads(self._generate(prompt, expect_json=True))
         except:
             return {"text": None}
 
-    def decide_strategy(self, persona, peak_hour, performance_report=None):
+    def generate_image_prompt(self, post_text):
         prompt = f"""
-        Act like a Content Strategist for Threads.
-        Persona: {persona}
-        Peak Activity Hour: {peak_hour}:00
-        Recent Performance Data: {performance_report}
-        
-        TASK: Decide the posting strategy for the next 24 hours.
-        CRITICAL: All topics must be in ENGLISH.
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "viral topic based on Influencer 2.0 structures"}}]}}
+        Post: "{post_text}"
+        Style: Minimalist technical art, neon orange accents, cinematic.
+        TASK: Generate a high-quality image prompt for Pollinations.ai. Max 150 chars.
         """
-        try:
-            raw = self._generate(prompt, expect_json=True)
-            return json.loads(raw)
-        except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "General Tech Insights"}]}
+        return self._generate(prompt)
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         prompt = f"""
+        Act like an Engagement Specialist.
         Persona: {persona}
-        Someone replied: "{reply_text}" to your post: "{post_text}"
-        TASK: Write a value-packed, smart reply in English. 
+        Reply: "{reply_text}" to: "{post_text}"
+        TASK: Write a smart, short reply in English. Avoid being generic.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting take! Let's dive deeper."}
+            return {"like": True, "reply": "Interesting point! Let's talk more about the technical side."}
