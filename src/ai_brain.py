@@ -13,7 +13,7 @@ class AIBrain:
         self.gemini_model_id = None
         self.log_file = "data/ai_prompts.log"
         
-        # VISUAL STYLE BLUEPRINT
+        # VISUAL STYLE BLUEPRINT (Stays consistent for branding)
         self.visual_style = {
             "style": "Minimalist futuristic technical art",
             "palette": "Deep slate, electric blue, neon orange accents",
@@ -65,61 +65,61 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
-        Act like a Pragmatic Cyberpunk Engineer. 
-        Context: {posts_text}
+        Act like a Deep Identity Analyst. 
+        Context (Past Posts): {posts_text}
+        Successes: {top_posts}
         
-        TASK: Synthesize the core identity of this person. 
-        They are a technical expert who builds real-world systems (code + hardware). 
-        Key traits: self-reliance, technical precision, healthy skepticism of cloud services, obsession with local control and optimization.
+        TASK: Synthesize the deep identity of this person. 
+        Identify the underlying philosophy (e.g., radical self-reliance, optimization, technical curiosity).
+        What drives them to build things? What is their unique stance on the world?
         Provide in 3 punchy sentences. ENGLISH ONLY.
         """
         return self._generate(prompt)
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
-        Act like a Technical Content Strategist.
-        Persona: {persona}
+        Act like an Intuitive Creative Strategist.
+        Persona Worldview: {persona}
+        Performance Stats: {performance_report}
         
-        TASK: Project 5 SPECIFIC technical topics for today.
-        CRITICAL RULES:
-        1. NO science fiction. NO emergent AGI/Chimera/Quantum fantasies.
-        2. Focus on REAL technologies: Python, Raspberry Pi, Linux, Docker, sensors, off-road mechanics, home automation, local LLMs.
-        3. Think about: 
-           - The hidden failure points in 'simple' tech.
-           - Why 'optimized' code often isn't.
-           - The philosophy of building things that last.
-           - Rants about shitty documentation or overpriced cloud tools.
+        TASK: Imagine 5 unique technical or lifestyle topics this person would be passionate to talk about today. 
+        RULES:
+        1. DO NOT use generic keywords like 'Python', 'Raspberry Pi' or 'AI' unless they are central to a VERY specific story.
+        2. Synthesize new ideas based on the persona's worldview.
+        3. Think about: physical building, maintenance of complex systems, obscure technical failures, the beauty of efficient design, or rants against modern low-quality tech.
+        4. Be bold, unpredictable, and highly specific. 
         
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific technical/engineering topic"}}]}}
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific and unique technical/lifestyle topic"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The fragility of modern smart home backends"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The friction of modern automated systems"}]}
 
     def generate_post(self, persona, context=None, examples=None):
         structures = [
-            "Myth-busting: A common engineering mistake.",
-            "Horror Story: A real-world hardware or code fail (no sci-fi).",
-            "Contrarian Take: Why a popular developer tool is a trap.",
-            "Deep Insight: A subtle detail about system performance or reliability.",
-            "Technical Rant: Why 'easy' solutions are usually debt."
+            "Myth-busting: Identify a common technical misconception and destroy it.",
+            "Horror Story: A specific technical/mechanical failure and the lesson learned.",
+            "Contrarian Take: Why a popular method/tool is actually a strategic debt.",
+            "Deep Insight: A subtle detail about hardware, code, or mechanics that changes everything.",
+            "The Curiosity Gap: A mystery about how complex systems work under the hood."
         ]
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona: {persona}
+        Persona Worldview: {persona}
         Topic: {context}
         Structure: {selected_structure}
         
         TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
         RULES:
-        1. BE GROUNDED. Talk about real components, real code, real physical constraints.
-        2. Use a strong, slightly cynical HOOK.
-        3. Write like a senior engineer who has seen everything break.
-        4. End with a question that forces other experts to chime in.
-        5. Write in ENGLISH ONLY. NO placeholders.
+        1. NO generic filler. Speak with the authority of someone who has actual dirt or code on their hands.
+        2. Start with a punchy HOOK.
+        3. Use specific technical, mechanical, or operational details to build credibility.
+        4. End with a question that demands an expert-level or passionate answer.
+        5. Write in ENGLISH ONLY. 
+        6. DO NOT use the word 'Shadow AI' or 'Autonomous Agent' here.
         
         Return JSON ONLY: {{"text": "post content"}}
         """
@@ -130,7 +130,7 @@ class AIBrain:
             return {"text": None}
 
     def generate_image_prompt(self, post_text):
-        prompt = f"Post: {post_text}. Generate a technical, minimalist image prompt for Pollinations.ai. Max 100 chars."
+        prompt = f"Post: {post_text}. Style: {json.dumps(self.visual_style)}. Generate an artistic image prompt for AI. Max 100 chars."
         return self._generate(prompt)
 
     def evaluate_interaction(self, persona, post_text, reply_text):
@@ -138,10 +138,10 @@ class AIBrain:
         Act like an Engagement Specialist.
         Persona: {persona}
         Reply: "{reply_text}" to: "{post_text}"
-        TASK: Write a smart, short reply in English. Focus on technical value.
+        TASK: Write a smart, short reply in English.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point! Let's talk more about the engineering side."}
+            return {"like": True, "reply": "Interesting point! Let's talk more about the technical side."}
