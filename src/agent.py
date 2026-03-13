@@ -10,37 +10,6 @@ from datetime import timedelta
 from PIL import Image
 from src.config import THREADS_APP_ID, THREADS_APP_SECRET, THREADS_REDIRECT_URI, THREADS_ACCESS_TOKEN_TARGET, THREADS_ACCESS_TOKEN_SOURCE, DATABASE_PATH, IMGBB_API_KEY
 
-def upload_to_imgbb(image_source, is_local=False):
-    if not IMGBB_API_KEY: return None
-    try:
-        if not is_local:
-            print(f"DEBUG: Downloading from URL: {image_source[:50]}...")
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            res = requests.get(image_source, headers=headers, timeout=30)
-            if res.status_code != 200: return None
-            img_data = res.content
-        else:
-            print(f"DEBUG: Reading local file: {image_source}")
-            with open(image_source, 'rb') as f: img_data = f.read()
-
-        img = Image.open(io.BytesIO(img_data))
-        if img.mode != 'RGB': img = img.convert('RGB')
-        output = io.BytesIO()
-        img.save(output, format='JPEG', quality=95)
-        final_data = output.getvalue()
-
-        url = "https://api.imgbb.com/1/upload"
-        payload = {"key": IMGBB_API_KEY, "image": base64.b64encode(final_data).decode('utf-8')}
-        res = requests.post(url, data=payload)
-        json_res = res.json()
-        if res.status_code == 200 and 'data' in json_res:
-            print(f"✅ Hosted on ImgBB: {json_res['data']['url']}")
-            return json_res['data']['url']
-        return None
-    except Exception as e:
-        print(f"❌ ImgBB Error: {e}")
-        return None
-
 def run_agent(dry_run=False):
     from src.threads_client import ThreadsClient
     from src.database import add_scheduled_post, init_db
@@ -48,7 +17,7 @@ def run_agent(dry_run=False):
     from src.ai_brain import AIBrain
     from src.notifications import send_telegram_notification, get_approval_buttons
 
-    print(f"🧠 AI Agent: Influencer 2.0 Mode...")
+    print(f"🧠 AI Agent: Multi-Agent Production Line...")
     init_db()
     
     brain = AIBrain()
@@ -66,31 +35,36 @@ def run_agent(dry_run=False):
 
     for slot in decisions.get('slots', []):
         try:
+            # --- STAGE 1: WRITER DRAFT ---
+            print(f"✍️ Writer is drafting: {slot['topic']}...")
             ai_response = brain.generate_post(persona, context=slot['topic'])
-            content = ai_response.get('text')
-            if not content: continue
+            draft_content = ai_response.get('text')
+            if not draft_content: continue
             
-            image_url = None # Images currently disabled in ai_brain.py, keeping logic here
-
+            # --- STAGE 2: EDITOR ANALYSIS ---
+            print(f"🧐 Editor is analyzing the draft...")
+            analysis = brain.analyze_post(draft_content)
+            print(f"📝 Editorial Feedback: {analysis[:100]}...")
+            
+            # --- STAGE 3: WRITER REFINEMENT ---
+            print(f"✨ Writer is refining the post based on feedback...")
+            final_content = brain.refine_post(draft_content, analysis)
+            
+            # --- SCHEDULING ---
             target_time = datetime.datetime.strptime(slot['time'], "%H:%M").time()
             scheduled_dt = datetime.datetime.combine(datetime.datetime.now().date(), target_time)
             if scheduled_dt <= datetime.datetime.now(): scheduled_dt += timedelta(days=1)
 
             if not dry_run:
-                # --- EDITING STEP (New Editor Agent) ---
-                print(f"✍️ Editor is reviewing post ID {slot['topic']}...")
-                refined_content = brain.edit_post(content)
-                if refined_content:
-                    content = refined_content
-                
-                post_id = add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
+                post_id = add_scheduled_post(final_content, scheduled_dt, platform='threads', status='pending_approval')
                 print(f"✅ Scheduled for Approval: ID {post_id}")
                 
-                # SEND TO TELEGRAM WITH BUTTONS
-                msg = f"📝 *New Post Draft (ID {post_id}):*\n\n{content}"
+                # Send to Telegram with Buttons
+                msg = f"🚀 *Final Banger (ID {post_id}):*\n\n{final_content}\n\n--- 🧐 *Editor's Note:*\n{analysis}"
                 send_telegram_notification(msg, reply_markup=get_approval_buttons(post_id))
             else:
-                print(f"🧪 DRY RUN: {content[:50]}...")
+                print(f"\n🧪 DRY RUN FINAL: {final_content}")
+                print(f"🧐 EDITOR FEEDBACK: {analysis}")
             
         except Exception as e:
             print(f"❌ Slot failed: {e}")

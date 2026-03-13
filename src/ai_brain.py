@@ -36,14 +36,14 @@ class AIBrain:
 
     def is_active(self): return True
 
-    def _log_prompt(self, prompt, response):
+    def _log_prompt(self, prompt, response, role="BRAIN"):
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with open(self.log_file, "a", encoding="utf-8") as f:
-                f.write(f"\n{'='*80}\n🕒 {timestamp} | {self.provider}\n📥 PROMPT:\n{prompt}\n📤 RESPONSE:\n{response}\n")
+                f.write(f"\n{'='*80}\n🕒 {timestamp} | ROLE: {role} | PROVIDER: {self.provider}\n📥 PROMPT:\n{prompt}\n📤 RESPONSE:\n{response}\n")
         except: pass
 
-    def _generate(self, prompt, expect_json=False):
+    def _generate(self, prompt, expect_json=False, role="BRAIN"):
         try:
             if self.provider == 'gemini':
                 config = {'response_mime_type': 'application/json'} if expect_json else None
@@ -53,21 +53,22 @@ class AIBrain:
                 format_type = 'json' if expect_json else None
                 res = self.ollama_client.generate(model=OLLAMA_MODEL, prompt=prompt, format=format_type)
                 content = res['response'].strip()
-            self._log_prompt(prompt, content)
+            self._log_prompt(prompt, content, role=role)
             return content
         except Exception as e:
-            self._log_prompt(prompt, f"ERROR: {e}")
+            self._log_prompt(prompt, f"ERROR: {e}", role=role)
             raise e
 
     def get_system_prompt(self):
+        dna = self.persona['linguistic_dna']
         return f"""
         YOU ARE: {self.persona['identity']}
-        CORE TOPICS: {', '.join(self.persona['topics'])}
-        STYLE: {self.persona['style']['tone']}
+        PHILOSOPHY: {self.persona['philosophy']}
+        PROJECTS: {', '.join(self.persona['projects'])}
+        TONE: {dna['tone']}
+        REACTIONS: Use '{dna['reactions']['inefficiency']}' for bad tech, 
+        and '{dna['reactions']['inevitable failure']}' for unavoidable issues.
         PRINCIPLES: {'; '.join(self.persona['principles'])}
-        LINGUISTIC MARKERS: {', '.join(self.persona['style']['linguistic_markers'])}
-        FORBIDDEN PHRASES: {', '.join(self.persona['style']['forbidden'])}
-        CRITICAL: Write in ENGLISH only.
         """
 
     def generate_persona(self, posts_text, top_posts=None):
@@ -77,64 +78,76 @@ class AIBrain:
         system = self.get_system_prompt()
         prompt = f"""
         {system}
-        TASK: Project 3 specific technical topics for the next 24h.
-        Be creative, varied, and avoid repetition.
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific topic description"}}]}}
+        TASK: Project 3 specific technical topics for today.
+        Avoid obvious 'AI news'. Focus on real engineering.
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific engineering topic"}}]}}
         """
         try:
-            raw = self._generate(prompt, expect_json=True)
+            raw = self._generate(prompt, expect_json=True, role="STRATEGIST")
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Pragmatic engineering insights"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Pragmatic software engineering hacks"}]}
 
     def generate_post(self, persona, context=None, examples=None):
+        """
+        ROLE: WRITER. Creates the first draft.
+        """
         system = self.get_system_prompt()
-        structures = [
-            "Technical Myth-busting", "Engineering Horror Story", "Contrarian Take", "Deep Technical Insight", "The Beauty of Efficiency"
-        ]
-        selected_structure = random.choice(structures)
-        
         prompt = f"""
         {system}
         Topic: {context}
-        Structure: {selected_structure}
-        
-        TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
-        1. Use a punchy HOOK.
-        2. Speak like a senior PHP/JS engineer.
-        3. Use LINGUISTIC MARKERS ONLY IF they feel 100% natural (don't force them).
-        
-        Return JSON ONLY: {{"text": "raw post content"}}
+        TASK: Write a first draft for a Threads post. Max 500 chars.
+        Focus on technical authenticity and a strong hook.
+        Return JSON ONLY: {{"text": "draft content"}}
         """
         try:
-            raw = self._generate(prompt, expect_json=True)
+            raw = self._generate(prompt, expect_json=True, role="WRITER_DRAFT")
             return json.loads(raw)
         except:
             return {"text": None}
 
-    def edit_post(self, raw_post_text):
+    def analyze_post(self, draft_text):
         """
-        ACTS AS AN EDITOR. Refines the post to sound more human and less 'AI-trying-too-hard'.
+        ROLE: EDITOR. Analyzes the draft and provides detailed critique.
         """
         prompt = f"""
-        ACT AS A SENIOR EDITOR for a high-end technical Threads account.
+        ACT AS A SENIOR EDITOR & TECH-LEAD.
         USER PERSONA: {self.persona['identity']}
-        RULES FOR EDITOR:
-        1. REMOVE 'крінжа' if it feels forced or used more than once in a paragraph.
-        2. REMOVE direct app links (e.g. flavorful.app) unless CRITICAL for the story.
-        3. MAKE IT HUMAN: Break the 'template' feel. Vary sentence length.
-        4. REMOVE generic AI questions at the end if they sound like a chatbot.
-        5. TONE: Pragmatic, slightly cynical, but helpful.
+        PHILOSOPHY: {self.persona['philosophy']}
         
-        ORIGINAL POST:
-        "{raw_post_text}"
+        CRITIQUE THIS DRAFT:
+        "{draft_text}"
         
-        TASK: Rewrite the post to be BETTER. Keep it under 500 chars. Return ONLY the rewritten text.
+        TASK: Provide a detailed analysis. Look for:
+        1. CLICHES: Is it too chatbot-y?
+        2. SLANG: Is 'cringe' or 'shit happens' used unnaturally?
+        3. BRANDING: Are project names used too much?
+        4. FLOW: Is the hook strong? Is the question at the end generic?
+        
+        Return your analysis as a list of specific improvements.
         """
-        try:
-            return self._generate(prompt).replace('"', '')
-        except:
-            return raw_post_text
+        return self._generate(prompt, role="EDITOR_CRITIQUE")
+
+    def refine_post(self, draft_text, analysis):
+        """
+        ROLE: WRITER. Rewrites the post based on Editor's feedback.
+        """
+        system = self.get_system_prompt()
+        prompt = f"""
+        {system}
+        
+        ORIGINAL DRAFT:
+        "{draft_text}"
+        
+        EDITOR'S FEEDBACK:
+        {analysis}
+        
+        TASK: Rewrite the post to be 100% authentic. 
+        Incorporate the feedback. Keep it under 500 chars. 
+        Speak like a human engineer, not an AI trying to sound like one.
+        Return ONLY the final text.
+        """
+        return self._generate(prompt, role="WRITER_FINAL").replace('"', '')
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         system = self.get_system_prompt()
@@ -145,6 +158,6 @@ class AIBrain:
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
-            return json.loads(self._generate(prompt, expect_json=True))
+            return json.loads(self._generate(prompt, expect_json=True, role="ENGAGEMENT"))
         except:
             return {"like": True, "reply": "Interesting point."}
