@@ -109,13 +109,14 @@ def run_agent(dry_run=False):
 
             if not dry_run:
                 post_id = add_scheduled_post(content, scheduled_dt, platform='threads', status='pending_approval')
-                if image_url:
-                    conn = sqlite3.connect(DATABASE_PATH)
-                    conn.cursor().execute('UPDATE scheduled_posts SET image_url = ? WHERE id = ?', (image_url, post_id))
-                    conn.commit()
-                    conn.close()
-                print(f"✅ Scheduled: ID {post_id} at {scheduled_dt}")
-            
+                print(f"✅ Scheduled for Approval: ID {post_id} at {scheduled_dt}")
+
+                # Send to Telegram with Buttons
+                from src.notifications import send_telegram_notification, get_approval_buttons
+                msg = f"📝 *New Post Draft (ID {post_id}):*\n\n{content}"
+                send_telegram_notification(msg, reply_markup=get_approval_buttons(post_id))
+            else:
+
         except Exception as e:
             print(f"❌ Slot failed: {e}")
 
