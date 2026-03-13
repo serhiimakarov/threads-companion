@@ -65,59 +65,61 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
-        Act like a Deep Branding Analyst. 
+        Act like a Pragmatic Cyberpunk Engineer. 
         Context: {posts_text}
-        Successes: {top_posts}
         
-        TASK: Synthesize the deep identity of this person. 
-        Don't just list hobbies. Identify the underlying philosophy (e.g., radical self-reliance, optimization obsession, technical curiosity).
-        Provide a 3-sentence description of this persona's worldview. ENGLISH ONLY.
+        TASK: Synthesize the core identity of this person. 
+        They are a technical expert who builds real-world systems (code + hardware). 
+        Key traits: self-reliance, technical precision, healthy skepticism of cloud services, obsession with local control and optimization.
+        Provide in 3 punchy sentences. ENGLISH ONLY.
         """
         return self._generate(prompt)
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
-        Act like an Intuitive Creative Strategist.
-        Persona Worldview: {persona}
-        Performance Stats: {performance_report}
+        Act like a Technical Content Strategist.
+        Persona: {persona}
         
-        TASK: Project 5 unique, non-obvious topics this person would be passionate to share today. 
-        RULES:
-        1. DO NOT repeat examples given in previous instructions.
-        2. Look for unexplored intersections of technology, life, and building things.
-        3. Think about: controversial industry shifts, obscure technical wins, personal rants about tool quality, or future-forward 'what if' scenarios.
-        4. Be bold and creative. Avoid generic 'tech news.'
+        TASK: Project 5 SPECIFIC technical topics for today.
+        CRITICAL RULES:
+        1. NO science fiction. NO emergent AGI/Chimera/Quantum fantasies.
+        2. Focus on REAL technologies: Python, Raspberry Pi, Linux, Docker, sensors, off-road mechanics, home automation, local LLMs.
+        3. Think about: 
+           - The hidden failure points in 'simple' tech.
+           - Why 'optimized' code often isn't.
+           - The philosophy of building things that last.
+           - Rants about shitty documentation or overpriced cloud tools.
         
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific and unique technical/lifestyle topic"}}]}}
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific technical/engineering topic"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The friction between legacy systems and modern autonomy"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The fragility of modern smart home backends"}]}
 
     def generate_post(self, persona, context=None, examples=None):
         structures = [
-            "Myth-busting: Identify a common technical misconception and destroy it.",
-            "Horror Story: A specific technical failure and the lesson learned.",
-            "Contrarian Take: Why a popular tech trend is actually bad for engineers.",
-            "Deep Insight: A subtle technical detail about hardware or code that matters.",
-            "Curiosity Gap: A mystery about how things work under the hood."
+            "Myth-busting: A common engineering mistake.",
+            "Horror Story: A real-world hardware or code fail (no sci-fi).",
+            "Contrarian Take: Why a popular developer tool is a trap.",
+            "Deep Insight: A subtle detail about system performance or reliability.",
+            "Technical Rant: Why 'easy' solutions are usually debt."
         ]
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona Worldview: {persona}
+        Persona: {persona}
         Topic: {context}
         Structure: {selected_structure}
         
         TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
         RULES:
-        1. NO generic filler. Speak with the authority of someone who has actual grease or code on their hands.
-        2. Start with a punchy HOOK.
-        3. Use specific technical or operational details to build credibility.
-        4. End with a question that demands an expert-level or passionate answer.
-        5. Write in ENGLISH ONLY.
+        1. BE GROUNDED. Talk about real components, real code, real physical constraints.
+        2. Use a strong, slightly cynical HOOK.
+        3. Write like a senior engineer who has seen everything break.
+        4. End with a question that forces other experts to chime in.
+        5. Write in ENGLISH ONLY. NO placeholders.
         
         Return JSON ONLY: {{"text": "post content"}}
         """
@@ -128,11 +130,7 @@ class AIBrain:
             return {"text": None}
 
     def generate_image_prompt(self, post_text):
-        prompt = f"""
-        Post: "{post_text}"
-        Style: {json.dumps(self.visual_style)}
-        TASK: Generate an artistic image prompt for Pollinations.ai. Max 150 chars.
-        """
+        prompt = f"Post: {post_text}. Generate a technical, minimalist image prompt for Pollinations.ai. Max 100 chars."
         return self._generate(prompt)
 
     def evaluate_interaction(self, persona, post_text, reply_text):
@@ -140,10 +138,10 @@ class AIBrain:
         Act like an Engagement Specialist.
         Persona: {persona}
         Reply: "{reply_text}" to: "{post_text}"
-        TASK: Write a smart, short reply in English.
+        TASK: Write a smart, short reply in English. Focus on technical value.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting take! Let's talk more about the technical side."}
+            return {"like": True, "reply": "Interesting point! Let's talk more about the engineering side."}
