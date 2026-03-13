@@ -65,33 +65,36 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
-        Act like a Creative Branding Consultant. 
+        Act like a Deep Branding Analyst. 
         Context: {posts_text}
         Successes: {top_posts}
         
-        TASK: Describe this person's 'Social Avatar'. 
-        What are their core obsessions? What's their unique voice? 
-        Provide in 3 sentences. ENGLISH ONLY.
+        TASK: Synthesize the deep identity of this person. 
+        Don't just list hobbies. Identify the underlying philosophy (e.g., radical self-reliance, optimization obsession, technical curiosity).
+        Provide a 3-sentence description of this persona's worldview. ENGLISH ONLY.
         """
         return self._generate(prompt)
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
-        Act like an Intuitive Content Strategist.
-        Persona: {persona}
-        Performance: {performance_report}
+        Act like an Intuitive Creative Strategist.
+        Persona Worldview: {persona}
+        Performance Stats: {performance_report}
         
-        TASK: Imagine what this person would write about in the next 24h. 
-        Don't just repeat what's in the profile. Synthesize new ideas at the intersection of their interests (e.g. AI + Off-roading, Python + DIY hardware, Productivity + Minimalism).
-        Think about: 1. Technical rants, 2. Unexpected discoveries, 3. Future predictions, 4. Workflow hacks.
+        TASK: Project 5 unique, non-obvious topics this person would be passionate to share today. 
+        RULES:
+        1. DO NOT repeat examples given in previous instructions.
+        2. Look for unexplored intersections of technology, life, and building things.
+        3. Think about: controversial industry shifts, obscure technical wins, personal rants about tool quality, or future-forward 'what if' scenarios.
+        4. Be bold and creative. Avoid generic 'tech news.'
         
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "creative technical topic description"}}]}}
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific and unique technical/lifestyle topic"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The hidden complexity of simple automation"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The friction between legacy systems and modern autonomy"}]}
 
     def generate_post(self, persona, context=None, examples=None):
         structures = [
@@ -104,16 +107,16 @@ class AIBrain:
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona: {persona}
+        Persona Worldview: {persona}
         Topic: {context}
-        Structure to follow: {selected_structure}
+        Structure: {selected_structure}
         
         TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
         RULES:
-        1. BE AUTHENTIC. Speak like a person who builds things with their hands and code.
-        2. NO generic AI talk. Use specific technical terms.
-        3. Use a strong HOOK.
-        4. End with a specific question to drive engagement.
+        1. NO generic filler. Speak with the authority of someone who has actual grease or code on their hands.
+        2. Start with a punchy HOOK.
+        3. Use specific technical or operational details to build credibility.
+        4. End with a question that demands an expert-level or passionate answer.
         5. Write in ENGLISH ONLY.
         
         Return JSON ONLY: {{"text": "post content"}}
@@ -143,4 +146,4 @@ class AIBrain:
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point! Let's talk more about the technical side."}
+            return {"like": True, "reply": "Interesting take! Let's talk more about the technical side."}
