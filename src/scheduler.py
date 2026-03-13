@@ -77,10 +77,17 @@ def run_scheduler():
         try: run_agent()
         except Exception as e: print(f"AI Agent failed: {e}")
 
+    def job_sync_persona():
+        print(f"[{datetime.now()}] 🔄 Syncing and evolving Persona...")
+        from src.persona_manager import PersonaManager
+        try: PersonaManager().sync_and_evolve()
+        except Exception as e: print(f"Persona sync failed: {e}")
+
     # Schedule jobs
     schedule.every(5).minutes.do(job_check_posts)
     schedule.every(5).minutes.do(job_process_interactions)
     schedule.every().sunday.at("03:00").do(job_refresh_tokens)
+    schedule.every().sunday.at("04:00").do(job_sync_persona)
     schedule.every().day.at("08:00").do(job_run_ai_agent)
     schedule.every().day.at("14:00").do(job_run_ai_agent)
     schedule.every().day.at("20:00").do(job_run_ai_agent)

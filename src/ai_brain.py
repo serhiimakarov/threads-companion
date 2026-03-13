@@ -5,7 +5,7 @@ import os
 import random
 from datetime import datetime
 from src.config import GEMINI_API_KEY, AI_PROVIDER, OLLAMA_MODEL, OLLAMA_HOST
-from src.persona_config import PERSONA_DATA
+from src.persona_config import load_persona
 
 class AIBrain:
     def __init__(self):
@@ -13,7 +13,7 @@ class AIBrain:
         self.gemini_client = None
         self.gemini_model_id = None
         self.log_file = "data/ai_prompts.log"
-        self.persona = PERSONA_DATA
+        self.persona = load_persona()
         
         os.makedirs("data", exist_ok=True)
         
@@ -60,19 +60,22 @@ class AIBrain:
             raise e
 
     def get_system_prompt(self):
-        dna = self.persona['linguistic_dna']
+        # Always reload to get latest version
+        self.persona = load_persona()
+        dna = self.persona.get('linguistic_dna', {})
+        reactions = dna.get('reactions', {})
         return f"""
-        YOU ARE: {self.persona['identity']}
-        PHILOSOPHY: {self.persona['philosophy']}
-        PROJECTS: {', '.join(self.persona['projects'])}
-        TONE: {dna['tone']}
-        REACTIONS: Use '{dna['reactions']['inefficiency']}' for bad tech, 
-        and '{dna['reactions']['inevitable failure']}' for unavoidable issues.
-        PRINCIPLES: {'; '.join(self.persona['principles'])}
+        YOU ARE: {self.persona.get('identity', 'A technical expert')}
+        PHILOSOPHY: {self.persona.get('philosophy', 'Pragmatism')}
+        PROJECTS: {', '.join(self.persona.get('projects', []))}
+        TONE: {dna.get('tone', 'Technical')}
+        REACTIONS: Use '{reactions.get('inefficiency', 'cringe')}' for bad tech, 
+        and '{reactions.get('inevitable failure', 'shit happens')}' for unavoidable issues.
+        PRINCIPLES: {'; '.join(self.persona.get('principles', []))}
         """
 
     def generate_persona(self, posts_text, top_posts=None):
-        return self.persona['identity']
+        return self.persona.get('identity', 'Pragmatic Engineer')
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         system = self.get_system_prompt()
@@ -89,16 +92,23 @@ class AIBrain:
             return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Pragmatic software engineering hacks"}]}
 
     def generate_post(self, persona, context=None, examples=None):
-        """
-        ROLE: WRITER. Creates the first draft.
-        """
         system = self.get_system_prompt()
+        structures = [
+            "Technical Myth-busting", "Engineering Horror Story", "Contrarian Take", "Deep Technical Insight", "The Beauty of Efficiency"
+        ]
+        selected_structure = random.choice(structures)
+        
         prompt = f"""
         {system}
         Topic: {context}
-        TASK: Write a first draft for a Threads post. Max 500 chars.
-        Focus on technical authenticity and a strong hook.
-        Return JSON ONLY: {{"text": "draft content"}}
+        Structure: {selected_structure}
+        
+        TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
+        1. Use a punchy HOOK.
+        2. Speak like a senior PHP/JS engineer.
+        3. Use LINGUISTIC MARKERS ONLY IF they feel 100% natural.
+        
+        Return JSON ONLY: {{"text": "raw post content"}}
         """
         try:
             raw = self._generate(prompt, expect_json=True, role="WRITER_DRAFT")
@@ -106,58 +116,36 @@ class AIBrain:
         except:
             return {"text": None}
 
-    def analyze_post(self, draft_text):
-        """
-        ROLE: EDITOR. Analyzes the draft and provides detailed critique.
-        """
+    def edit_post(self, raw_post_text):
+        dna = self.persona.get('linguistic_dna', {})
+        reactions = dna.get('reactions', {})
         prompt = f"""
-        ACT AS A SENIOR EDITOR & TECH-LEAD.
-        USER PERSONA: {self.persona['identity']}
-        PHILOSOPHY: {self.persona['philosophy']}
+        ACT AS A SENIOR EDITOR. 
+        PERSONA: {self.persona.get('identity')}
+        PHILOSOPHY: {self.persona.get('philosophy')}
+        RULES:
+        1. Ensure the tone is dry and pragmatic.
+        2. Use '{reactions.get('inefficiency')}' or '{reactions.get('inevitable failure')}' ONLY if perfectly natural.
+        3. Remove any generic chatbot-style excitement.
+        4. Keep it under 500 chars.
         
-        CRITIQUE THIS DRAFT:
-        "{draft_text}"
-        
-        TASK: Provide a detailed analysis. Look for:
-        1. CLICHES: Is it too chatbot-y?
-        2. SLANG: Is 'cringe' or 'shit happens' used unnaturally?
-        3. BRANDING: Are project names used too much?
-        4. FLOW: Is the hook strong? Is the question at the end generic?
-        
-        Return your analysis as a list of specific improvements.
+        POST: "{raw_post_text}"
+        Return ONLY the rewritten text.
         """
-        return self._generate(prompt, role="EDITOR_CRITIQUE")
-
-    def refine_post(self, draft_text, analysis):
-        """
-        ROLE: WRITER. Rewrites the post based on Editor's feedback.
-        """
-        system = self.get_system_prompt()
-        prompt = f"""
-        {system}
-        
-        ORIGINAL DRAFT:
-        "{draft_text}"
-        
-        EDITOR'S FEEDBACK:
-        {analysis}
-        
-        TASK: Rewrite the post to be 100% authentic. 
-        Incorporate the feedback. Keep it under 500 chars. 
-        Speak like a human engineer, not an AI trying to sound like one.
-        Return ONLY the final text.
-        """
-        return self._generate(prompt, role="WRITER_FINAL").replace('"', '')
+        try:
+            return self._generate(prompt, role="EDITOR_CRITIQUE").replace('"', '')
+        except:
+            return raw_post_text
 
     def evaluate_interaction(self, persona, post_text, reply_text):
         system = self.get_system_prompt()
         prompt = f"""
         {system}
         Reply: "{reply_text}" to: "{post_text}"
-        TASK: Write a smart, short reply in English.
+        TASK: Write a smart, short reply in English. Avoid generic AI fluff.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True, role="ENGAGEMENT"))
         except:
-            return {"like": True, "reply": "Interesting point."}
+            return {"like": True, "reply": "Interesting point. Worth investigating."}

@@ -25,9 +25,19 @@ def handle_callback(callback_query):
     elif data.startswith("delete_"):
         post_id = data.replace("delete_", "")
         action = "deleted"
-        # We use a trick to 'kill' it in DB
         mark_post_status(post_id, 'failed')
         status_text = "🗑️ *Post Deleted.*"
+    elif data == "persona_upgrade":
+        from src.persona_manager import PersonaManager
+        PersonaManager().apply_upgrade()
+        action = "persona_upgraded"
+        status_text = "🏆 *Persona Constitution Upgraded!*"
+    elif data == "persona_discard":
+        import os
+        if os.path.exists("data/proposed_persona.json"):
+            os.remove("data/proposed_persona.json")
+        action = "persona_discarded"
+        status_text = "🗑️ *Evolution Discarded.*"
     
     if action:
         # Edit the original message to show status
