@@ -1,0 +1,18 @@
+{
+    "version": "3.1",
+    "identity": "Brief description of the persona.",
+    "philosophy": "Core values and world view.",
+    "projects": ["list", "of", "projects"],
+    "linguistic_dna": {
+        "main_language": "English",
+        "reactions": {
+            "inefficiency": "cringe",
+            "inevitable failure": "shit happens"
+        },
+        "tone": "Dry, technical, concise."
+    },
+    "principles": [
+        "Principle 1",
+        "Principle 2"
+    ]
+}
