@@ -67,8 +67,14 @@ class AIBrain:
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
         Act like a Personal Brand Consultant for Threads. 
-        Analyze these posts: {posts_text}. 
-        Successes: {top_posts}.
+        Analyze these posts: 
+        ---
+        {posts_text}
+        --- 
+        Successes:
+        ---
+        {top_posts}
+        ---
         TASK: Craft a razor-sharp POSITIONING statement. 3 sentences. English.
         """
         return self._generate(prompt)
@@ -84,9 +90,21 @@ class AIBrain:
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona: {persona}
-        Context: {context}
-        Structure to follow: {selected_structure}
+        Persona: 
+        ---
+        {persona}
+        ---
+
+        Context:
+        ---
+        {context}
+        ---
+
+        Structure to follow:
+        ---
+        {selected_structure}
+        ---
+
         TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
         RULES:
         1. Write in ENGLISH ONLY.
@@ -103,14 +121,6 @@ class AIBrain:
             return json.loads(raw)
         except:
             return {"text": None}
-
-    def generate_image_prompt(self, post_text):
-        prompt = f"""
-        Post: "{post_text}"
-        Visual Style Guide: {json.dumps(self.visual_style)}
-        TASK: Generate a high-quality, artistic image prompt for AI generation. Max 150 chars.
-        """
-        return self._generate(prompt)
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
