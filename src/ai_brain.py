@@ -74,20 +74,23 @@ class AIBrain:
         """
         return self._generate(prompt)
 
-    def generate_post(self, persona, context=None, examples=None):
-        # BROAD RANGE OF TOPICS to avoid repetition
-        topics = [
-            "Hardware hacking and Raspberry Pi secrets",
-            "Python automation tips for real-world problems",
-            "IoT and Smart Home architecture fails",
-            "The reality of building AI agents locally",
-            "Off-road tech and Jeep modifications",
-            "Software engineering best practices vs reality",
-            "Minimalist technical setup and tools"
-        ]
-        selected_topic = context if context else random.choice(topics)
+    def decide_strategy(self, persona, peak_hour, performance_report=None):
+        prompt = f"""
+        Act like a Content Strategist.
+        Persona: {persona}
+        Performance: {performance_report}
         
-        # VIRAL STRUCTURES
+        TASK: Decide posting slots for the next 24h. 
+        Focus on varied technical topics: Hardware, Code, Automation, Off-roading.
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific technical topic"}}]}}
+        """
+        try:
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
+        except:
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Technical DIY Insight"}]}
+
+    def generate_post(self, persona, context=None, examples=None):
         structures = [
             "Myth-busting: A common technical misconception.",
             "Horror Story: A hardware/software failure.",
@@ -99,11 +102,11 @@ class AIBrain:
         
         prompt = f"""
         Persona: {persona}
-        Topic: {selected_topic}
+        Topic: {context}
         Structure: {selected_structure}
         
-        TASK: Create a Threads post. Max 500 chars.
-        CRITICAL RULES:
+        TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
+        RULES:
         1. NO generic 'AI talking about AI' posts. Be a TECH EXPERT first.
         2. Talk about real things: soldering, latency, backends, engines, sensors.
         3. Use a strong HOOK.
@@ -114,7 +117,8 @@ class AIBrain:
         Return JSON ONLY: {{"text": "post content"}}
         """
         try:
-            return json.loads(self._generate(prompt, expect_json=True))
+            raw = self._generate(prompt, expect_json=True)
+            return json.loads(raw)
         except:
             return {"text": None}
 
