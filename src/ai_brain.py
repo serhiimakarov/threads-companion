@@ -65,54 +65,56 @@ class AIBrain:
 
     def generate_persona(self, posts_text, top_posts=None):
         prompt = f"""
-        Act like a Personal Brand Consultant. 
-        Current Context: DIY Electronics, Raspberry Pi, Software Engineering, Python, Automation, Jeeps, and AI experiments.
+        Act like a Creative Branding Consultant. 
+        Context: {posts_text}
+        Successes: {top_posts}
         
-        TASK: Craft a razor-sharp POSITIONING statement for this Social Avatar.
-        Focus on being a technical expert who builds real things.
-        3 sentences max. ENGLISH ONLY.
+        TASK: Describe this person's 'Social Avatar'. 
+        What are their core obsessions? What's their unique voice? 
+        Provide in 3 sentences. ENGLISH ONLY.
         """
         return self._generate(prompt)
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
         prompt = f"""
-        Act like a Content Strategist.
+        Act like an Intuitive Content Strategist.
         Persona: {persona}
         Performance: {performance_report}
         
-        TASK: Decide posting slots for the next 24h. 
-        Focus on varied technical topics: Hardware, Code, Automation, Off-roading.
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific technical topic"}}]}}
+        TASK: Imagine what this person would write about in the next 24h. 
+        Don't just repeat what's in the profile. Synthesize new ideas at the intersection of their interests (e.g. AI + Off-roading, Python + DIY hardware, Productivity + Minimalism).
+        Think about: 1. Technical rants, 2. Unexpected discoveries, 3. Future predictions, 4. Workflow hacks.
+        
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "creative technical topic description"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "Technical DIY Insight"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The hidden complexity of simple automation"}]}
 
     def generate_post(self, persona, context=None, examples=None):
         structures = [
-            "Myth-busting: A common technical misconception.",
-            "Horror Story: A hardware/software failure.",
-            "Contrarian Take: Why a popular tool/method is actually bad.",
-            "Deep Insight: A subtle technical detail that changes everything.",
-            "Curiosity Gap: A mystery about a specific hardware/code."
+            "Myth-busting: Identify a common technical misconception and destroy it.",
+            "Horror Story: A specific technical failure and the lesson learned.",
+            "Contrarian Take: Why a popular tech trend is actually bad for engineers.",
+            "Deep Insight: A subtle technical detail about hardware or code that matters.",
+            "Curiosity Gap: A mystery about how things work under the hood."
         ]
         selected_structure = random.choice(structures)
         
         prompt = f"""
         Persona: {persona}
         Topic: {context}
-        Structure: {selected_structure}
+        Structure to follow: {selected_structure}
         
-        TASK: Create a SCROLL-STOPPING Threads post. Max 500 chars.
+        TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
         RULES:
-        1. NO generic 'AI talking about AI' posts. Be a TECH EXPERT first.
-        2. Talk about real things: soldering, latency, backends, engines, sensors.
+        1. BE AUTHENTIC. Speak like a person who builds things with their hands and code.
+        2. NO generic AI talk. Use specific technical terms.
         3. Use a strong HOOK.
-        4. NO hashtags, NO placeholders.
-        5. End with a specific question about the TOPIC.
-        6. NO mention of being an 'AI agent' unless the topic is specifically about building one.
+        4. End with a specific question to drive engagement.
+        5. Write in ENGLISH ONLY.
         
         Return JSON ONLY: {{"text": "post content"}}
         """
@@ -125,8 +127,8 @@ class AIBrain:
     def generate_image_prompt(self, post_text):
         prompt = f"""
         Post: "{post_text}"
-        Style: Minimalist technical art, neon orange accents, cinematic.
-        TASK: Generate a high-quality image prompt for Pollinations.ai. Max 150 chars.
+        Style: {json.dumps(self.visual_style)}
+        TASK: Generate an artistic image prompt for Pollinations.ai. Max 150 chars.
         """
         return self._generate(prompt)
 
@@ -135,7 +137,7 @@ class AIBrain:
         Act like an Engagement Specialist.
         Persona: {persona}
         Reply: "{reply_text}" to: "{post_text}"
-        TASK: Write a smart, short reply in English. Avoid being generic.
+        TASK: Write a smart, short reply in English.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
