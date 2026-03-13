@@ -5,6 +5,7 @@ import os
 import random
 from datetime import datetime
 from src.config import GEMINI_API_KEY, AI_PROVIDER, OLLAMA_MODEL, OLLAMA_HOST
+from src.persona_config import PERSONA_DATA
 
 class AIBrain:
     def __init__(self):
@@ -12,14 +13,7 @@ class AIBrain:
         self.gemini_client = None
         self.gemini_model_id = None
         self.log_file = "data/ai_prompts.log"
-        
-        # VISUAL STYLE BLUEPRINT (Stays consistent for branding)
-        self.visual_style = {
-            "style": "Minimalist futuristic technical art",
-            "palette": "Deep slate, electric blue, neon orange accents",
-            "atmosphere": "Cinematic, high contrast, clean lines",
-            "technical_detail": "Schematic diagrams, internal components, digital glow"
-        }
+        self.persona = PERSONA_DATA
         
         os.makedirs("data", exist_ok=True)
         
@@ -36,7 +30,9 @@ class AIBrain:
                 self.provider = 'ollama'
         
         if self.provider == 'ollama':
-            self.ollama_client = ollama.Client(host=OLLAMA_HOST)
+            try:
+                self.ollama_client = ollama.Client(host=OLLAMA_HOST)
+            except: pass
 
     def is_active(self): return True
 
@@ -63,63 +59,56 @@ class AIBrain:
             self._log_prompt(prompt, f"ERROR: {e}")
             raise e
 
-    def generate_persona(self, posts_text, top_posts=None):
-        prompt = f"""
-        Act like a Deep Identity Analyst. 
-        Context (Past Posts): {posts_text}
-        Successes: {top_posts}
-        
-        TASK: Synthesize the deep identity of this person. 
-        Identify the underlying philosophy (e.g., radical self-reliance, optimization, technical curiosity).
-        What drives them to build things? What is their unique stance on the world?
-        Provide in 3 punchy sentences. ENGLISH ONLY.
+    def get_system_prompt(self):
+        return f"""
+        YOU ARE: {self.persona['identity']}
+        CORE TOPICS: {', '.join(self.persona['topics'])}
+        STYLE: {self.persona['style']['tone']}
+        PRINCIPLES: {'; '.join(self.persona['principles'])}
+        LINGUISTIC MARKERS: {', '.join(self.persona['style']['linguistic_markers'])}
+        FORBIDDEN PHRASES: {', '.join(self.persona['style']['forbidden'])}
+        CRITICAL: Write in ENGLISH only.
         """
-        return self._generate(prompt)
+
+    def generate_persona(self, posts_text, top_posts=None):
+        # We now use the static constitution but can still 'tune' it with recent vibe
+        return self.persona['identity']
 
     def decide_strategy(self, persona, peak_hour, performance_report=None):
+        system = self.get_system_prompt()
         prompt = f"""
-        Act like an Intuitive Creative Strategist.
-        Persona Worldview: {persona}
-        Performance Stats: {performance_report}
+        {system}
         
-        TASK: Imagine 5 unique technical or lifestyle topics this person would be passionate to talk about today. 
-        RULES:
-        1. DO NOT use generic keywords like 'Python', 'Raspberry Pi' or 'AI' unless they are central to a VERY specific story.
-        2. Synthesize new ideas based on the persona's worldview.
-        3. Think about: physical building, maintenance of complex systems, obscure technical failures, the beauty of efficient design, or rants against modern low-quality tech.
-        4. Be bold, unpredictable, and highly specific. 
-        
-        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "highly specific and unique technical/lifestyle topic"}}]}}
+        TASK: Project 3-5 specific technical or solopreneur topics for the next 24h.
+        Be authentic to your PHP/JS and DIY background.
+        Return JSON ONLY: {{"slots": [{{"time": "HH:MM", "topic": "specific topic description"}}]}}
         """
         try:
             raw = self._generate(prompt, expect_json=True)
             return json.loads(raw)
         except:
-            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The friction of modern automated systems"}]}
+            return {"slots": [{"time": f"{peak_hour:02d}:00", "topic": "The reality of independent product engineering"}]}
 
     def generate_post(self, persona, context=None, examples=None):
+        system = self.get_system_prompt()
         structures = [
-            "Myth-busting: Identify a common technical misconception and destroy it.",
-            "Horror Story: A specific technical/mechanical failure and the lesson learned.",
-            "Contrarian Take: Why a popular method/tool is actually a strategic debt.",
-            "Deep Insight: A subtle detail about hardware, code, or mechanics that changes everything.",
-            "The Curiosity Gap: A mystery about how complex systems work under the hood."
+            "Technical Myth-busting: Destroy a common dev/hardware misconception.",
+            "Engineering Horror Story: A real fail and the lesson.",
+            "Contrarian Take: Why a popular tool or method is strategic debt.",
+            "Deep Technical Insight: A detail about code or hardware performance.",
+            "The Beauty of Efficiency: A rant about clean design or minimalism."
         ]
         selected_structure = random.choice(structures)
         
         prompt = f"""
-        Persona Worldview: {persona}
+        {system}
         Topic: {context}
         Structure: {selected_structure}
         
         TASK: Write a SCROLL-STOPPING Threads post. Max 500 chars.
-        RULES:
-        1. NO generic filler. Speak with the authority of someone who has actual dirt or code on their hands.
-        2. Start with a punchy HOOK.
-        3. Use specific technical, mechanical, or operational details to build credibility.
-        4. End with a question that demands an expert-level or passionate answer.
-        5. Write in ENGLISH ONLY. 
-        6. DO NOT use the word 'Shadow AI' or 'Autonomous Agent' here.
+        1. Use a punchy HOOK.
+        2. Speak like a senior PHP/JS engineer.
+        3. End with a question for builders.
         
         Return JSON ONLY: {{"text": "post content"}}
         """
@@ -129,19 +118,16 @@ class AIBrain:
         except:
             return {"text": None}
 
-    def generate_image_prompt(self, post_text):
-        prompt = f"Post: {post_text}. Style: {json.dumps(self.visual_style)}. Generate an artistic image prompt for AI. Max 100 chars."
-        return self._generate(prompt)
-
     def evaluate_interaction(self, persona, post_text, reply_text):
+        system = self.get_system_prompt()
         prompt = f"""
-        Act like an Engagement Specialist.
-        Persona: {persona}
+        {system}
         Reply: "{reply_text}" to: "{post_text}"
-        TASK: Write a smart, short reply in English.
+        
+        TASK: Write a smart, short reply in English. Avoid generic 'AI' phrases.
         Return JSON: {{"like": true, "reply": "text"}}
         """
         try:
             return json.loads(self._generate(prompt, expect_json=True))
         except:
-            return {"like": True, "reply": "Interesting point! Let's talk more about the technical side."}
+            return {"like": True, "reply": "Interesting point. Let's look at the technical trade-offs."}
